@@ -50,15 +50,15 @@
     padding: 14px 16px; box-shadow: var(--shadow);
     display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   }
-  .year-bar label { font-size: 14px; color: var(--text-light); white-space: nowrap; }
+  .year-bar label { font-size: 12px; color: var(--text-light); white-space: nowrap; }
   .year-bar select {
-    flex: 1 1 120px; min-width: 0; min-height: 44px;
-    padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 10px;
+    flex: 0 0 auto; width: 130px; min-width: 0; min-height: 34px;
+    padding: 6px 22px 6px 8px; border: 1.5px solid var(--border); border-radius: 10px;
     font-size: 16px; /* 16px 防 iOS 聚焦自动放大 */
     background: #fff; color: var(--text); outline: none;
     appearance: none; -webkit-appearance: none;
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238c8177' stroke-width='2' fill='none'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px;
+    background-repeat: no-repeat; background-position: right 8px center;
   }
   .year-summary { text-align: right; }
   .year-summary .lab { font-size: 12px; color: var(--text-light); }
