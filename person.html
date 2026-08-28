@@ -80,6 +80,7 @@
   .income-cell { color: var(--income); }
   .card-cell { color: #2f6fed; }
   .balance-cell { color: var(--text); font-weight: 700; }
+  .deposit-cell { color: var(--primary-dark); font-weight: 700; }
   .source-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; background: #f2eee8; color: var(--text-light); white-space: nowrap; }
   .action-btns { display: flex; gap: 8px; justify-content: flex-end; }
   tfoot td {
@@ -96,31 +97,35 @@
   .rec-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .rec-date { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .rec-grid {
-    margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    margin-top: 10px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
   }
   .rec-grid .cell {
     background: #fdf8f1; border-radius: 10px; padding: 8px 4px; text-align: center;
   }
+  .rec-grid .cell.hl { background: #fff2e2; }
   .rec-grid .lab { font-size: 11px; color: var(--text-light); }
   .rec-grid .val {
-    font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
+    font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;
     margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .rec-grid .val.income { color: var(--income); }
   .rec-grid .val.cardv { color: #2f6fed; }
   .rec-grid .val.balance { color: var(--text); }
+  .rec-grid .val.deposit { color: var(--primary-dark); }
   .rec-actions { margin-top: 12px; display: flex; justify-content: flex-end; gap: 10px; }
 
   /* 移动端合计 */
   .card-sum { display: block; padding: 14px 15px; background: #fdf8f1; border-top: 2px solid var(--border); }
   .card-sum .lab { font-size: 12px; color: var(--text-light); margin-bottom: 8px; }
-  .card-sum .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .card-sum .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .card-sum .item { background: #fff; border-radius: 10px; padding: 8px 4px; text-align: center; }
+  .card-sum .item.hl { background: #fff2e2; }
   .card-sum .k { font-size: 11px; color: var(--text-light); }
   .card-sum .v { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card-sum .v.income { color: var(--income); }
   .card-sum .v.cardv { color: #2f6fed; }
   .card-sum .v.balance { color: var(--text); }
+  .card-sum .v.deposit { color: var(--primary-dark); }
 
   .edit-btn, .del-btn {
     border: none; background: #f7f1ea; border-radius: 8px; font-size: 13px;
@@ -227,12 +232,13 @@
           <th class="amt">收入</th>
           <th class="amt">卡账</th>
           <th class="amt">余额</th>
+          <th class="amt">存款</th>
           <th>来源</th>
           <th></th>
         </tr>
       </thead>
       <tbody id="listBody">
-        <tr><td colspan="6" class="loading">加载中…</td></tr>
+        <tr><td colspan="7" class="loading">加载中…</td></tr>
       </tbody>
       <tfoot id="sumFoot" style="display:none;">
         <tr>
@@ -240,6 +246,7 @@
           <td class="amt income-cell" id="sumIncome">¥0.00</td>
           <td class="amt card-cell" id="sumCard">¥0.00</td>
           <td class="amt balance-cell" id="sumBalance">¥0.00</td>
+          <td class="amt deposit-cell" id="sumDeposit">¥0.00</td>
           <td></td>
           <td></td>
         </tr>
@@ -257,6 +264,7 @@
       <div class="item"><div class="k">总收入</div><div class="v income" id="mSumIncome">¥0.00</div></div>
       <div class="item"><div class="k">总卡账</div><div class="v cardv" id="mSumCard">¥0.00</div></div>
       <div class="item"><div class="k">总余额</div><div class="v balance" id="mSumBalance">¥0.00</div></div>
+      <div class="item hl"><div class="k">总存款</div><div class="v deposit" id="mSumDeposit">¥0.00</div></div>
     </div>
   </div>
 
@@ -286,7 +294,11 @@
       <div class="error-tip" id="tipCard">请输入正确的卡账</div>
     </div>
 
-    <div class="balance-hint">本笔余额：<b id="balanceHint">¥0.00</b>（自动计算，不可修改）</div>
+    <div class="balance-hint">
+      <div>本笔余额：<b id="balanceHint">¥0.00</b>（收入 − 卡账）</div>
+      <div style="margin-top:5px;">本笔存款：<b id="depositHint">¥0.00</b>（余额 × 90%）</div>
+      <div style="font-size:11px; margin-top:5px;">两项均自动计算，不可修改</div>
+    </div>
 
     <div class="field" style="margin-top:16px;">
       <label>来源</label>
@@ -332,19 +344,25 @@ function fmtMoney(n) {
   return '¥' + num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// 卡账存放在 note 字段的 JSON 中：{"card": 6500}
-function parseCard(note) {
-  if (!note) return 0;
+// note 字段存 JSON：{"card": 6500, "save": 5670}
+//   card = 卡账，save = 存款（存款也落库，非仅前端计算）
+function parseNote(note) {
+  if (!note) return {};
   try {
     const o = JSON.parse(note);
-    return Number(o.card) || 0;
+    return (o && typeof o === 'object') ? o : {};
   } catch (e) {
-    return 0;
+    return {};
   }
 }
 
 function computeBalance(income, card) {
   return (Number(income) || 0) - (Number(card) || 0);
+}
+
+// 存款 = 余额 × 90%（保留两位小数）
+function computeDeposit(balance) {
+  return Math.round((Number(balance) || 0) * 0.9 * 100) / 100;
 }
 
 async function load() {
@@ -361,10 +379,12 @@ async function load() {
   }
   records = (data || []).map(r => {
     const income = Number(r.amount) || 0;
-    const card = parseCard(r.note);
-    return {
-      id: r.id, date: r.date, income, card, balance: computeBalance(income, card), source: r.source
-    };
+    const n = parseNote(r.note);
+    const card = Number(n.card) || 0;
+    const balance = computeBalance(income, card);
+    // 优先取库中已存的存款，缺失时（历史数据）按公式补算
+    const deposit = (n.save != null && n.save !== '') ? Number(n.save) : computeDeposit(balance);
+    return { id: r.id, date: r.date, income, card, balance, deposit, source: r.source };
   });
   document.getElementById('syncTip').textContent = '已同步 · 共 ' + records.length + ' 条';
   render();
@@ -384,6 +404,7 @@ function render() {
       <td class="amount-cell income-cell">${fmtMoney(r.income)}</td>
       <td class="amount-cell card-cell">${fmtMoney(r.card)}</td>
       <td class="amount-cell balance-cell">${fmtMoney(r.balance)}</td>
+      <td class="amount-cell deposit-cell">${fmtMoney(r.deposit)}</td>
       <td><span class="source-tag">${r.source}</span></td>
       <td>
         <div class="action-btns">
@@ -415,6 +436,10 @@ function render() {
           <div class="lab">余额</div>
           <div class="val balance">${fmtMoney(r.balance)}</div>
         </div>
+        <div class="cell hl">
+          <div class="lab">存款（×90%）</div>
+          <div class="val deposit">${fmtMoney(r.deposit)}</div>
+        </div>
       </div>
       <div class="rec-actions">
         <button class="edit-btn" onclick="editRecord(${r.id})">编辑</button>
@@ -427,16 +452,19 @@ function render() {
   // 合计
   const sumIncome = records.reduce((s, r) => s + r.income, 0);
   const sumCard = records.reduce((s, r) => s + r.card, 0);
-  const sumBalance = computeBalance(sumIncome, sumCard);
+  const sumBalance = records.reduce((s, r) => s + r.balance, 0);
+  const sumDeposit = records.reduce((s, r) => s + Number(r.deposit || 0), 0);
 
   document.getElementById('sumIncome').textContent = fmtMoney(sumIncome);
   document.getElementById('sumCard').textContent = fmtMoney(sumCard);
   document.getElementById('sumBalance').textContent = fmtMoney(sumBalance);
+  document.getElementById('sumDeposit').textContent = fmtMoney(sumDeposit);
   document.getElementById('sumFoot').style.display = records.length ? 'table-footer-group' : 'none';
 
   document.getElementById('mSumIncome').textContent = fmtMoney(sumIncome);
   document.getElementById('mSumCard').textContent = fmtMoney(sumCard);
   document.getElementById('mSumBalance').textContent = fmtMoney(sumBalance);
+  document.getElementById('mSumDeposit').textContent = fmtMoney(sumDeposit);
   document.getElementById('cardSum').style.display = records.length ? 'block' : 'none';
 
   document.getElementById('emptyTip').style.display = records.length ? 'none' : 'block';
@@ -445,7 +473,9 @@ function render() {
 function updateBalanceHint() {
   const income = Number(document.getElementById('fIncome').value) || 0;
   const card = Number(document.getElementById('fCard').value) || 0;
-  document.getElementById('balanceHint').textContent = fmtMoney(computeBalance(income, card));
+  const balance = computeBalance(income, card);
+  document.getElementById('balanceHint').textContent = fmtMoney(balance);
+  document.getElementById('depositHint').textContent = fmtMoney(computeDeposit(balance));
 }
 
 function openModal() {
@@ -506,13 +536,17 @@ async function saveRecord() {
   }
   if (!ok) return;
 
-  // 余额 = 收入 - 卡账（自动计算，不入库）
+  // 余额 = 收入 − 卡账（自动计算，不入库）
+  // 存款 = 余额 × 90%（自动计算，落库保存）
+  const balance = computeBalance(income, card);
+  const deposit = computeDeposit(balance);
+
   const payload = {
     date,
-    amount: income,                       // 收入
+    amount: income,                              // 收入
     type: '个人',
     source,
-    note: JSON.stringify({ card })        // 卡账存于 note JSON
+    note: JSON.stringify({ card, save: deposit })  // 卡账 + 存款 存于 note JSON
   };
 
   submitting = true;
