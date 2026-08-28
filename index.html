@@ -77,6 +77,40 @@
 
   .sync-tip { text-align: center; font-size: 12px; color: var(--text-light); padding: 6px 14px; }
 
+  /* 筛选栏 */
+  .filter-bar {
+    display: flex; align-items: flex-end; gap: 10px;
+    margin: 0 14px 8px; padding: 12px;
+    background: var(--card); border-radius: 14px; box-shadow: var(--shadow);
+    flex-wrap: wrap;
+  }
+  .filter-group { flex: 1; min-width: 92px; display: flex; flex-direction: column; gap: 5px; }
+  .filter-group label { font-size: 12px; color: var(--text-light); }
+  .filter-group select {
+    width: 100%; padding: 8px 28px 8px 10px;
+    border: 1.5px solid var(--border); border-radius: 10px;
+    font-size: 16px; min-height: 40px; background: #fff; color: var(--text); outline: none;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238c8177' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+  }
+  .filter-group select:focus { border-color: var(--primary); }
+  .filter-info {
+    display: flex; justify-content: space-between; align-items: center;
+    margin: 0 14px 10px; font-size: 12px; color: var(--text-light); gap: 10px; flex-wrap: wrap;
+  }
+  .filter-info b { color: var(--text); }
+  .filter-clear {
+    border: none; background: #f2eee8; color: var(--text-light);
+    font-size: 12px; padding: 6px 12px; border-radius: 12px; cursor: pointer;
+    min-height: 32px; white-space: nowrap;
+  }
+  .filter-clear:hover { background: #e9e0d4; }
+  .filter-clear:active { opacity: .7; }
+  @media (min-width: 721px) {
+    .filter-group { max-width: 200px; }
+  }
+
   .list-wrap {
     background: var(--card); margin: 0 14px; border-radius: 16px;
     box-shadow: var(--shadow); overflow: hidden;
@@ -230,6 +264,38 @@
   </div>
 </div>
 
+<div class="filter-bar">
+  <div class="filter-group">
+    <label for="filterSource">来源</label>
+    <select id="filterSource" onchange="applyFilter()">
+      <option value="">全部来源</option>
+      <option value="爸爸">爸爸</option>
+      <option value="妈妈">妈妈</option>
+      <option value="儿子">儿子</option>
+      <option value="家庭">家庭</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label for="filterYear">年份</label>
+    <select id="filterYear" onchange="applyFilter()">
+      <option value="">全部年份</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label for="filterMethod">类型</label>
+    <select id="filterMethod" onchange="applyFilter()">
+      <option value="">全部类型</option>
+      <option value="存入">存入</option>
+      <option value="支出">支出</option>
+    </select>
+  </div>
+</div>
+
+<div class="filter-info">
+  <span id="filterInfo">全部记录 · 0 条</span>
+  <button class="filter-clear" id="clearBtn" onclick="clearFilters()">清除筛选</button>
+</div>
+
 <div class="toolbar">
   <div class="title">存钱记录</div>
   <button class="btn-add" onclick="openModal()">＋ 新增</button>
@@ -331,6 +397,9 @@ const SUPABASE_KEY = 'sb_publishable_pbzgGVvgjaSovXpCmp8-qw_AlafRvF6';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let records = [];
+let filterSource = '';
+let filterYear = '';
+let filterMethod = '';
 let currentMethod = '存入';
 let editingId = null;
 let pendingDeleteId = null;
@@ -364,6 +433,34 @@ async function load() {
     note: r.note || ''
   }));
   document.getElementById('syncTip').textContent = '已同步 · 共 ' + records.length + ' 条';
+  populateYears();
+  render();
+}
+
+// 年份下拉：从已有记录动态生成（按日期前 4 位取年份，去重降序）
+function populateYears() {
+  const sel = document.getElementById('filterYear');
+  const years = [...new Set(records.map(r => (r.date || '').substring(0, 4)).filter(Boolean))].sort().reverse();
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">全部年份</option>' +
+    years.map(y => '<option value="' + y + '">' + y + ' 年</option>').join('');
+  if (cur && years.includes(cur)) sel.value = cur;
+}
+
+// 应用筛选（来源 / 年份 / 类型）
+function applyFilter() {
+  filterSource = document.getElementById('filterSource').value || '';
+  filterYear = document.getElementById('filterYear').value || '';
+  filterMethod = document.getElementById('filterMethod').value || '';
+  render();
+}
+
+// 清除全部筛选条件
+function clearFilters() {
+  filterSource = ''; filterYear = ''; filterMethod = '';
+  document.getElementById('filterSource').value = '';
+  document.getElementById('filterYear').value = '';
+  document.getElementById('filterMethod').value = '';
   render();
 }
 
@@ -373,7 +470,15 @@ function render() {
   tbody.innerHTML = '';
   clist.innerHTML = '';
 
-  records.forEach(r => {
+  // 多维筛选：来源 / 年份 / 类型（空 = 全部）
+  const filtered = records.filter(r => {
+    if (filterSource && r.source !== filterSource) return false;
+    if (filterYear && (r.date || '').substring(0, 4) !== filterYear) return false;
+    if (filterMethod && r.method !== filterMethod) return false;
+    return true;
+  });
+
+  filtered.forEach(r => {
     const isIn = r.method === '存入';
     const cls = isIn ? 'in' : 'out';
     const amtText = (isIn ? '+' : '-') + Number(r.amount).toLocaleString('zh-CN', { minimumFractionDigits: 2 });
@@ -417,10 +522,16 @@ function render() {
     clist.appendChild(card);
   });
 
-  document.getElementById('emptyTip').style.display = records.length ? 'none' : 'block';
+  const emptyTip = document.getElementById('emptyTip');
+  emptyTip.style.display = filtered.length ? 'none' : 'block';
+  if (!filtered.length) {
+    emptyTip.textContent = records.length
+      ? '没有符合筛选条件的记录，试试「清除筛选」～'
+      : '还没有记录，点击右上角「＋ 新增」开始存钱吧～';
+  }
 
   let totalIn = 0, totalOut = 0;
-  records.forEach(r => {
+  filtered.forEach(r => {
     if (r.method === '存入') totalIn += Number(r.amount);
     else totalOut += Number(r.amount);
   });
@@ -434,6 +545,15 @@ function render() {
   const ft = document.getElementById('footerTotal');
   ft.textContent = fmtMoney(total);
   ft.style.color = total >= 0 ? 'var(--income)' : 'var(--expense)';
+
+  // 筛选信息（当前范围 + 命中 / 总数）
+  const scopeParts = [];
+  if (filterSource) scopeParts.push('来源：' + filterSource);
+  if (filterYear) scopeParts.push('年份：' + filterYear);
+  if (filterMethod) scopeParts.push('类型：' + filterMethod);
+  const scopeText = scopeParts.length ? scopeParts.join(' / ') : '全部记录';
+  document.getElementById('filterInfo').innerHTML =
+    scopeText + ' · <b>' + filtered.length + '</b> / ' + records.length + ' 条';
 }
 
 function openModal() {
