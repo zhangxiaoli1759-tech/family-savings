@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>年度分析 · 家庭存钱计划</title>
+<script src="supabase-js.min.js"></script>
+<style>
+  :root {
+    --primary: #ff9f43;
+    --primary-dark: #e8892e;
+    --income: #e74c3c;
+    --expense: #27ae60;
+    --bg: #f7f4ef;
+    --card: #ffffff;
+    --text: #3d3229;
+    --text-light: #8c8177;
+    --border: #eee6dc;
+    --shadow: 0 4px 16px rgba(120, 90, 40, .08);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  body { background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
+
+  .header {
+    background: linear-gradient(135deg, #ffb457, #ff8c42);
+    color: #fff;
+    padding: 24px 24px 52px;
+    border-radius: 0 0 28px 28px;
+  }
+  .header a.back {
+    display: inline-flex; align-items: center; gap: 4px;
+    color: #fff; text-decoration: none; font-size: 13px; opacity: .95;
+    background: rgba(255,255,255,.2); padding: 5px 12px; border-radius: 14px;
+  }
+  .header h1 { font-size: 20px; font-weight: 700; margin-top: 14px; }
+  .header p { font-size: 13px; opacity: .9; margin-top: 4px; }
+
+  .year-bar {
+    background: var(--card);
+    margin: -36px 16px 16px;
+    border-radius: 16px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .year-bar label { font-size: 14px; color: var(--text-light); }
+  .year-bar select {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 15px;
+    background: #fff;
+    color: var(--text);
+    outline: none;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238c8177' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 34px;
+  }
+  .year-summary {
+    text-align: right;
+  }
+  .year-summary .lab { font-size: 12px; color: var(--text-light); }
+  .year-summary .val { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .card {
+    background: var(--card);
+    margin: 0 16px 16px;
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 18px 16px 8px;
+  }
+  .card h2 { font-size: 15px; margin-bottom: 14px; padding-left: 4px; }
+
+  /* 柱状图 */
+  .chart {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    gap: 4px;
+    height: 230px;
+    padding: 10px 4px 0;
+    border-bottom: 2px solid var(--border);
+  }
+  .bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    min-width: 0;
+  }
+  .bar-val {
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    color: var(--text-light);
+  }
+  .bar {
+    width: 70%;
+    max-width: 26px;
+    border-radius: 6px 6px 0 0;
+    transition: height .4s ease;
+    min-height: 2px;
+  }
+  .bar.in { background: linear-gradient(180deg, #ff7a66, var(--income)); }
+  .bar.out { background: linear-gradient(180deg, #5fd08a, var(--expense)); }
+  .bar-label {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* 统计表 */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: right;
+    padding: 11px 12px;
+    background: #fdf8f1;
+    color: var(--text-light);
+    font-size: 12px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+  }
+  thead th:first-child { text-align: left; }
+  tbody td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  tbody td:first-child { text-align: left; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr.total-row {
+    background: #fdf8f1;
+    font-weight: 700;
+  }
+  .num.in { color: var(--income); }
+  .num.out { color: var(--expense); }
+
+  .empty { text-align: center; padding: 40px 0; color: var(--text-light); font-size: 14px; }
+  .loading { text-align:center; padding: 30px; color: var(--text-light); font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <a class="back" href="index.html">‹ 返回</a>
+  <h1>📊 年度分析</h1>
+  <p>每月合计剩余资金一览</p>
+</div>
+
+<div class="year-bar">
+  <label for="yearSel">选择年份</label>
+  <select id="yearSel"></select>
+  <div class="year-summary">
+    <div class="lab">年度结余</div>
+    <div class="val" id="yearTotal">¥ 0.00</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>月度柱状图（合计剩余资金）</h2>
+  <div class="chart" id="chart"><div class="loading">加载中…</div></div>
+</div>
+
+<div class="card">
+  <h2>月度统计表</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>月份</th>
+        <th>存入合计</th>
+        <th>支出合计</th>
+        <th>剩余资金</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody">
+      <tr><td colspan="4" class="loading">加载中…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://cbnbbrrfbolwvuejoqmk.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_pbzgGVvgjaSovXpCmp8-qw_AlafRvF6';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function fmtMoney(n) {
+  const num = Number(n) || 0;
+  const s = Math.abs(num).toLocaleString('zh-CN', { minimumFractionDigits: 2 });
+  return (num < 0 ? '-¥' : '¥') + s;
+}
+
+// 年份下拉：当前年前后各 5 年
+function buildYearSelect() {
+  const sel = document.getElementById('yearSel');
+  const cur = new Date().getFullYear();
+  for (let y = cur - 5; y <= cur + 5; y++) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y + ' 年';
+    if (y === cur) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.addEventListener('change', () => load(sel.value));
+}
+
+async function load(year) {
+  const { data, error } = await supabaseClient
+    .from('savings_records')
+    .select('date, amount, method')
+    .like('date', year + '-%');
+
+  if (error) {
+    document.getElementById('chart').innerHTML = '<div class="empty">加载失败：' + error.message + '</div>';
+    document.getElementById('tableBody').innerHTML = '<tr><td colspan="4" class="empty">加载失败</td></tr>';
+    return;
+  }
+
+  // 12 个月聚合
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const m = String(i + 1).padStart(2, '0');
+    return { month: year + '-' + m, label: (i + 1) + '月', in: 0, out: 0, remain: 0 };
+  });
+
+  (data || []).forEach(r => {
+    const idx = parseInt(r.date.split('-')[1], 10) - 1;
+    if (idx < 0 || idx > 11) return;
+    const amt = Number(r.amount) || 0;
+    if (r.method === '存入') months[idx].in += amt;
+    else months[idx].out += amt;
+    months[idx].remain = months[idx].in - months[idx].out;
+  });
+
+  const yearRemain = months.reduce((s, m) => s + m.remain, 0);
+  const yt = document.getElementById('yearTotal');
+  yt.textContent = fmtMoney(yearRemain);
+  yt.style.color = yearRemain >= 0 ? 'var(--income)' : 'var(--expense)';
+
+  renderChart(months);
+  renderTable(months, yearRemain);
+}
+
+function renderChart(months) {
+  const chart = document.getElementById('chart');
+  chart.innerHTML = '';
+  const maxAbs = Math.max(1, ...months.map(m => Math.abs(m.remain)));
+  const maxBar = 170; // px
+
+  months.forEach(m => {
+    const col = document.createElement('div');
+    col.className = 'bar-col';
+    const h = Math.max(2, Math.round((Math.abs(m.remain) / maxAbs) * maxBar));
+    const cls = m.remain >= 0 ? 'in' : 'out';
+    col.innerHTML = `
+      <div class="bar-val">${m.remain === 0 ? '' : fmtMoney(m.remain)}</div>
+      <div class="bar ${cls}" style="height:${h}px"></div>
+      <div class="bar-label">${m.label}</div>
+    `;
+    chart.appendChild(col);
+  });
+}
+
+function renderTable(months, yearRemain) {
+  const tb = document.getElementById('tableBody');
+  tb.innerHTML = '';
+  if (months.every(m => m.remain === 0 && m.in === 0 && m.out === 0)) {
+    tb.innerHTML = '<tr><td colspan="4" class="empty">该年份暂无记录</td></tr>';
+    return;
+  }
+  months.forEach(m => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${m.label}</td>
+      <td class="num in">${fmtMoney(m.in)}</td>
+      <td class="num out">${fmtMoney(m.out)}</td>
+      <td class="num ${m.remain >= 0 ? 'in' : 'out'}">${fmtMoney(m.remain)}</td>
+    `;
+    tb.appendChild(tr);
+  });
+  const tr = document.createElement('tr');
+  tr.className = 'total-row';
+  tr.innerHTML = `
+    <td>年度合计</td>
+    <td class="num in">${fmtMoney(months.reduce((s, m) => s + m.in, 0))}</td>
+    <td class="num out">${fmtMoney(months.reduce((s, m) => s + m.out, 0))}</td>
+    <td class="num ${yearRemain >= 0 ? 'in' : 'out'}">${fmtMoney(yearRemain)}</td>
+  `;
+  tb.appendChild(tr);
+}
+
+buildYearSelect();
+load(new Date().getFullYear());
+</script>
+</body>
+</html>
