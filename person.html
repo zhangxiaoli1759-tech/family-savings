@@ -99,8 +99,6 @@
   .stat-item .v.balance { color: var(--text); }
   .stat-item .v.deposit { color: var(--primary-dark); }
 
-  .sync-tip { text-align: center; font-size: 12px; color: var(--text-light); padding: 0 14px 6px; }
-
   .list-wrap {
     background: var(--card); margin: 0 14px; border-radius: 16px;
     box-shadow: var(--shadow); overflow: hidden;
@@ -128,6 +126,7 @@
     font-size: 11px; font-weight: 600; background: #fff2e2; color: var(--primary-dark);
     vertical-align: middle;
   }
+  .rate-tag.full { background: #e8f7ef; color: var(--expense); }
   .source-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; background: #f2eee8; color: var(--text-light); white-space: nowrap; }
   .action-btns { display: flex; gap: 8px; justify-content: center; }
 
@@ -146,6 +145,7 @@
   }
   .rec-grid .cell.hl { background: #fff2e2; }
   .rec-grid .lab { font-size: 11px; color: var(--text-light); }
+  .rec-grid .lab.rate-full { color: var(--expense); font-weight: 700; }
   .rec-grid .val {
     font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;
     margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -285,8 +285,6 @@
     <span class="cnt" id="filterCount">—</span>
   </div>
 </div>
-
-<div class="sync-tip" id="syncTip">数据加载中…</div>
 
 <div class="list-wrap">
   <!-- 桌面：表格 -->
@@ -448,14 +446,13 @@ async function syncSavings(sid, date, deposit, source) {
 }
 
 async function load() {
-  document.getElementById('syncTip').textContent = '数据同步中…';
   const { data, error } = await supabaseClient
     .from('personal_records')
     .select('*')
     .order('date', { ascending: false });
 
   if (error) {
-    document.getElementById('syncTip').textContent = '加载失败：' + error.message;
+    document.getElementById('filterCount').textContent = '加载失败';
     console.error(error);
     return;
   }
@@ -480,7 +477,6 @@ async function load() {
     // sid = 联动写入存款表(savings_records)的那条记录 id，用于编辑时更新、删除时联动清理
     return { id: r.id, date: r.date, income, card, balance, deposit, rate, source: r.source, sid: n.sid || null };
   });
-  document.getElementById('syncTip').textContent = '已同步 · 共 ' + records.length + ' 条';
   render();
 }
 
@@ -507,7 +503,7 @@ function render() {
       <td class="amount-cell income-cell">${fmtMoney(r.income)}</td>
       <td class="amount-cell card-cell">${fmtMoney(r.card)}</td>
       <td class="amount-cell balance-cell">${fmtMoney(r.balance)}</td>
-      <td class="amount-cell deposit-cell">${fmtMoney(r.deposit)}<span class="rate-tag">${fmtRate(r.rate)}</span></td>
+      <td class="amount-cell deposit-cell">${fmtMoney(r.deposit)}<span class="rate-tag${r.rate >= 1 ? ' full' : ''}">${fmtRate(r.rate)}</span></td>
       <td><span class="source-tag">${r.source}</span></td>
       <td>
         <div class="action-btns">
@@ -540,7 +536,7 @@ function render() {
           <div class="val balance">${fmtMoney(r.balance)}</div>
         </div>
         <div class="cell hl">
-          <div class="lab">存款（×${fmtRate(r.rate)}）</div>
+          <div class="lab${r.rate >= 1 ? ' rate-full' : ''}">存款（×${fmtRate(r.rate)}）</div>
           <div class="val deposit">${fmtMoney(r.deposit)}</div>
         </div>
       </div>
