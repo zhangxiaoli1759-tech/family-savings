@@ -115,6 +115,26 @@
   }
   .footer-total .val { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
+  .analysis-entry {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 14px 16px;
+    background: #fdf8f1;
+    border-top: 1px solid var(--border);
+  }
+  .analysis-entry a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--primary-dark);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .analysis-entry a:hover { color: var(--primary); }
+
   .mask {
     display: none;
     position: fixed; inset: 0;
@@ -231,6 +251,9 @@
   <div class="footer-total">
     <span>总金额（存入 + / 支出 −）</span>
     <span class="val" id="footerTotal">¥ 0.00</span>
+  </div>
+  <div class="analysis-entry">
+    <a href="stats.html">📊 年度分析 ›</a>
   </div>
 </div>
 
