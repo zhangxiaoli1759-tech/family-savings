@@ -70,10 +70,12 @@
   .type-其他 { background: #f2eee8; color: var(--text-light); }
   .source-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; background: #f2eee8; color: var(--text-light); white-space: nowrap; }
   .note-cell { color: var(--text-light); font-size: 13px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .action-btns { display: flex; gap: 4px; }
-  .edit-btn, .del-btn { border: none; background: none; color: #ccc; font-size: 16px; cursor: pointer; padding: 2px 6px; }
-  .edit-btn:hover { color: var(--primary); }
-  .del-btn:hover { color: var(--expense); }
+  .action-btns { display: flex; gap: 6px; }
+  .edit-btn, .del-btn { border: none; background: #f7f1ea; border-radius: 8px; font-size: 13px; cursor: pointer; padding: 6px 10px; white-space: nowrap; }
+  .edit-btn { color: var(--primary-dark); }
+  .edit-btn:hover { background: #fff0e0; }
+  .del-btn { color: var(--expense); }
+  .del-btn:hover { background: #e8f7ef; }
   .empty { text-align: center; padding: 48px 0; color: var(--text-light); font-size: 14px; }
 
   .mask {
@@ -104,6 +106,7 @@
   .btn-cancel { flex: 1; padding: 12px 0; border: none; border-radius: 12px; background: #f2eee8; color: var(--text-light); font-size: 15px; cursor: pointer; }
   .btn-confirm { flex: 2; padding: 12px 0; border: none; border-radius: 12px; background: var(--primary); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
   .btn-confirm:hover { background: var(--primary-dark); }
+  .btn-confirm:disabled { background: #f0c9a0; cursor: not-allowed; }
   .error-tip { color: var(--expense); font-size: 12px; margin-top: 4px; display: none; }
   .loading { text-align:center; padding: 30px; color: var(--text-light); font-size: 14px; }
 
@@ -203,6 +206,8 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let records = [];
 let editingId = null;
+let submitting = false;
+let deleting = false;
 
 function fmtMoney(n) {
   const num = Number(n) || 0;
@@ -242,8 +247,8 @@ function render() {
       <td class="note-cell" title="${r.note || ''}">${r.note || '—'}</td>
       <td>
         <div class="action-btns">
-          <button class="edit-btn" onclick="editRecord(${r.id})" title="编辑">✏️</button>
-          <button class="del-btn" onclick="delRecord(${r.id})" title="删除">🗑</button>
+          <button class="edit-btn" onclick="editRecord(${r.id})">编辑</button>
+          <button class="del-btn" onclick="delRecord(${r.id})">删除</button>
         </div>
       </td>
     `;
@@ -291,6 +296,7 @@ function hideTips() {
 }
 
 async function saveRecord() {
+  if (submitting) return; // 防重复提交：提交期间忽略后续点击
   hideTips();
   const date = document.getElementById('fDate').value;
   const type = document.getElementById('fType').value;
@@ -308,11 +314,25 @@ async function saveRecord() {
 
   const payload = { date, type, amount, source, note };
 
+  submitting = true;
+  const btn = document.querySelector('.btn-confirm');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '保存中…';
+
   let res;
-  if (editingId) {
-    res = await supabaseClient.from('personal_records').update(payload).eq('id', editingId);
-  } else {
-    res = await supabaseClient.from('personal_records').insert(payload);
+  try {
+    if (editingId) {
+      res = await supabaseClient.from('personal_records').update(payload).eq('id', editingId);
+    } else {
+      res = await supabaseClient.from('personal_records').insert(payload);
+    }
+  } catch (err) {
+    res = { error: { message: err.message } };
+  } finally {
+    submitting = false;
+    btn.disabled = false;
+    btn.textContent = originalText;
   }
 
   if (res.error) {
@@ -324,8 +344,18 @@ async function saveRecord() {
 }
 
 async function delRecord(id) {
+  if (deleting) return; // 防重复点击
   if (!confirm('确定删除这条记录吗？')) return;
-  const { error } = await supabaseClient.from('personal_records').delete().eq('id', id);
+  deleting = true;
+  let error = null;
+  try {
+    const r = await supabaseClient.from('personal_records').delete().eq('id', id);
+    error = r.error;
+  } catch (err) {
+    error = { message: err.message };
+  } finally {
+    deleting = false;
+  }
   if (error) { alert('删除失败：' + error.message); return; }
   await load();
 }
