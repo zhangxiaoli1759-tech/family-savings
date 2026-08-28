@@ -2,7 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>个人分析 · 家庭存钱计划</title>
 <script src="supabase-js.min.js"></script>
 <style>
@@ -18,47 +19,60 @@
     --border: #eee6dc;
     --shadow: 0 4px 16px rgba(120, 90, 40, .08);
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
-  body { background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
+  * {
+    margin: 0; padding: 0; box-sizing: border-box;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    overflow-x: hidden;
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  }
 
   .header {
     background: linear-gradient(135deg, #ffb457, #ff8c42);
     color: #fff;
-    padding: 24px 24px 56px;
+    padding: calc(22px + env(safe-area-inset-top)) 18px 54px;
     border-radius: 0 0 28px 28px;
   }
   .header a.back {
     display: inline-flex; align-items: center; gap: 4px;
     color: #fff; text-decoration: none; font-size: 13px; opacity: .95;
-    background: rgba(255,255,255,.2); padding: 5px 12px; border-radius: 14px;
+    background: rgba(255,255,255,.2); padding: 7px 12px; border-radius: 14px;
   }
   .header h1 { font-size: 20px; font-weight: 700; margin-top: 14px; }
-  .header p { font-size: 13px; opacity: .9; margin-top: 4px; }
+  .header p { font-size: 13px; opacity: .9; margin-top: 6px; }
 
   .toolbar {
     display: flex; justify-content: space-between; align-items: center;
-    margin: -36px 16px 12px;
+    margin: -36px 14px 10px;
   }
   .toolbar .title { font-size: 16px; font-weight: 600; }
   .btn-add {
-    background: var(--primary); color: #fff; border: none; border-radius: 20px;
-    padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+    background: var(--primary); color: #fff; border: none; border-radius: 22px;
+    padding: 0 20px; min-height: 40px; font-size: 14px; font-weight: 600; cursor: pointer;
   }
   .btn-add:hover { background: var(--primary-dark); }
+  .btn-add:active { transform: scale(.97); }
 
-  .sync-tip { text-align: center; font-size: 12px; color: var(--text-light); padding: 6px; }
+  .sync-tip { text-align: center; font-size: 12px; color: var(--text-light); padding: 6px 14px; }
 
   .list-wrap {
-    background: var(--card); margin: 0 16px; border-radius: 16px;
+    background: var(--card); margin: 0 14px; border-radius: 16px;
     box-shadow: var(--shadow); overflow: hidden;
   }
+
+  /* 桌面：表格 */
+  .table-view { display: none; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   thead th {
     text-align: left; padding: 12px 14px; background: #fdf8f1; color: var(--text-light);
     font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border);
   }
   thead th.amt { text-align: right; }
-  tbody td { padding: 13px 14px; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 13px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover { background: #fffaf3; }
   .date-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -67,19 +81,58 @@
   .card-cell { color: #2f6fed; }
   .balance-cell { color: var(--text); font-weight: 700; }
   .source-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; background: #f2eee8; color: var(--text-light); white-space: nowrap; }
-  .action-btns { display: flex; gap: 6px; }
-  .edit-btn, .del-btn { border: none; background: #f7f1ea; border-radius: 8px; font-size: 13px; cursor: pointer; padding: 6px 10px; white-space: nowrap; }
-  .edit-btn { color: var(--primary-dark); }
-  .edit-btn:hover { background: #fff0e0; }
-  .del-btn { color: var(--expense); }
-  .del-btn:hover { background: #e8f7ef; }
-  .empty { text-align: center; padding: 48px 0; color: var(--text-light); font-size: 14px; }
-
+  .action-btns { display: flex; gap: 8px; justify-content: flex-end; }
   tfoot td {
     padding: 13px 14px; background: #fdf8f1; font-weight: 700; font-size: 13px;
     border-top: 2px solid var(--border); color: var(--text);
   }
   tfoot .amt { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* 移动：卡片列表 */
+  .card-list { display: block; }
+  .rec-card { padding: 14px 15px; border-bottom: 1px solid var(--border); }
+  .rec-card:last-child { border-bottom: none; }
+  .rec-card:active { background: #fffaf3; }
+  .rec-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .rec-date { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .rec-grid {
+    margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  }
+  .rec-grid .cell {
+    background: #fdf8f1; border-radius: 10px; padding: 8px 4px; text-align: center;
+  }
+  .rec-grid .lab { font-size: 11px; color: var(--text-light); }
+  .rec-grid .val {
+    font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
+    margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .rec-grid .val.income { color: var(--income); }
+  .rec-grid .val.cardv { color: #2f6fed; }
+  .rec-grid .val.balance { color: var(--text); }
+  .rec-actions { margin-top: 12px; display: flex; justify-content: flex-end; gap: 10px; }
+
+  /* 移动端合计 */
+  .card-sum { display: block; padding: 14px 15px; background: #fdf8f1; border-top: 2px solid var(--border); }
+  .card-sum .lab { font-size: 12px; color: var(--text-light); margin-bottom: 8px; }
+  .card-sum .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .card-sum .item { background: #fff; border-radius: 10px; padding: 8px 4px; text-align: center; }
+  .card-sum .k { font-size: 11px; color: var(--text-light); }
+  .card-sum .v { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-sum .v.income { color: var(--income); }
+  .card-sum .v.cardv { color: #2f6fed; }
+  .card-sum .v.balance { color: var(--text); }
+
+  .edit-btn, .del-btn {
+    border: none; background: #f7f1ea; border-radius: 8px; font-size: 13px;
+    cursor: pointer; padding: 9px 16px; min-height: 38px; white-space: nowrap;
+  }
+  .edit-btn { color: var(--primary-dark); }
+  .edit-btn:hover { background: #fff0e0; }
+  .del-btn { color: var(--expense); }
+  .del-btn:hover { background: #e8f7ef; }
+  .edit-btn:active, .del-btn:active { opacity: .7; }
+
+  .empty { text-align: center; padding: 44px 18px; color: var(--text-light); font-size: 14px; }
 
   .mask {
     display: none; position: fixed; inset: 0; background: rgba(50, 40, 30, .45);
@@ -88,16 +141,20 @@
   .mask.show { display: flex; }
   .modal {
     background: var(--card); width: 100%; max-width: 520px; border-radius: 20px 20px 0 0;
-    padding: 22px 20px calc(20px + env(safe-area-inset-bottom)); animation: slideUp .25s ease;
+    padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
+    animation: slideUp .25s ease;
+    max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
   }
   @keyframes slideUp { from { transform: translateY(60px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
   .modal h3 { font-size: 17px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; }
-  .modal-close { border: none; background: #f2eee8; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; color: var(--text-light); font-size: 14px; }
+  .modal-close { border: none; background: #f2eee8; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: var(--text-light); font-size: 14px; }
   .field { margin-bottom: 16px; }
   .field label { display: block; font-size: 13px; color: var(--text-light); margin-bottom: 6px; }
   .field input, .field select {
-    width: 100%; padding: 11px 12px; border: 1.5px solid var(--border); border-radius: 10px;
-    font-size: 15px; background: #fff; color: var(--text); outline: none;
+    width: 100%; padding: 12px; border: 1.5px solid var(--border); border-radius: 10px;
+    font-size: 16px; /* 16px 防 iOS 聚焦自动放大 */
+    min-height: 46px;
+    background: #fff; color: var(--text); outline: none;
     appearance: none; -webkit-appearance: none;
   }
   .field select {
@@ -105,32 +162,43 @@
     background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px;
   }
   .field input:focus, .field select:focus { border-color: var(--primary); }
-  .modal-actions { display: flex; gap: 12px; margin-top: 22px; }
-  .btn-cancel { flex: 1; padding: 12px 0; border: none; border-radius: 12px; background: #f2eee8; color: var(--text-light); font-size: 15px; cursor: pointer; }
-  .btn-confirm { flex: 2; padding: 12px 0; border: none; border-radius: 12px; background: var(--primary); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .balance-hint {
+    font-size: 13px; color: var(--text-light); background: #fdf8f1;
+    border-radius: 10px; padding: 11px 12px;
+  }
+  .balance-hint b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .modal-actions { display: flex; gap: 12px; margin-top: 20px; }
+  .btn-cancel {
+    flex: 1; padding: 0; min-height: 46px; border: none; border-radius: 12px;
+    background: #f2eee8; color: var(--text-light); font-size: 15px; cursor: pointer;
+  }
+  .btn-confirm {
+    flex: 2; padding: 0; min-height: 46px; border: none; border-radius: 12px;
+    background: var(--primary); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
   .btn-confirm:hover { background: var(--primary-dark); }
   .btn-confirm:disabled { background: #f0c9a0; cursor: not-allowed; }
   .error-tip { color: var(--expense); font-size: 12px; margin-top: 4px; display: none; }
-  .balance-hint {
-    margin-top: 4px; font-size: 13px; color: var(--text-light);
-    background: #fdf8f1; border-radius: 10px; padding: 9px 12px;
-  }
-  .balance-hint b { color: var(--text); font-variant-numeric: tabular-nums; }
-  .loading { text-align:center; padding: 30px; color: var(--text-light); font-size: 14px; }
+  .loading { text-align: center; padding: 30px; color: var(--text-light); font-size: 14px; }
 
   .confirm-box {
-    background: var(--card); width: 84%; max-width: 320px; border-radius: 16px; padding: 24px 20px 18px;
+    background: var(--card); width: 86%; max-width: 320px; border-radius: 16px; padding: 24px 20px 18px;
     text-align: center; animation: slideUp .2s ease;
   }
   .confirm-text { font-size: 15px; color: var(--text); margin-bottom: 22px; line-height: 1.5; }
   .confirm-actions { display: flex; gap: 12px; }
   .confirm-actions .btn-cancel { flex: 1; }
-  .btn-danger { flex: 1; padding: 11px 0; border: none; border-radius: 12px; background: var(--expense); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn-danger {
+    flex: 1; padding: 0; min-height: 44px; border: none; border-radius: 12px;
+    background: var(--expense); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
   .btn-danger:hover { background: #1f9c51; }
 
-  @media (min-width: 600px) {
+  @media (min-width: 721px) {
+    .table-view { display: block; }
+    .card-list, .card-sum { display: none; }
     .mask { align-items: center; }
-    .modal { border-radius: 20px; }
+    .modal { border-radius: 20px; max-height: 86vh; }
   }
 </style>
 </head>
@@ -150,31 +218,48 @@
 <div class="sync-tip" id="syncTip">数据加载中…</div>
 
 <div class="list-wrap">
-  <table>
-    <thead>
-      <tr>
-        <th>月份</th>
-        <th class="amt">收入</th>
-        <th class="amt">卡账</th>
-        <th class="amt">余额</th>
-        <th>来源</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody id="listBody">
-      <tr><td colspan="6" class="loading">加载中…</td></tr>
-    </tbody>
-    <tfoot id="sumFoot" style="display:none;">
-      <tr>
-        <td>合计</td>
-        <td class="amt income-cell" id="sumIncome">¥0.00</td>
-        <td class="amt card-cell" id="sumCard">¥0.00</td>
-        <td class="amt balance-cell" id="sumBalance">¥0.00</td>
-        <td></td>
-        <td></td>
-      </tr>
-    </tfoot>
-  </table>
+  <!-- 桌面：表格 -->
+  <div class="table-view">
+    <table>
+      <thead>
+        <tr>
+          <th>月份</th>
+          <th class="amt">收入</th>
+          <th class="amt">卡账</th>
+          <th class="amt">余额</th>
+          <th>来源</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="listBody">
+        <tr><td colspan="6" class="loading">加载中…</td></tr>
+      </tbody>
+      <tfoot id="sumFoot" style="display:none;">
+        <tr>
+          <td>合计</td>
+          <td class="amt income-cell" id="sumIncome">¥0.00</td>
+          <td class="amt card-cell" id="sumCard">¥0.00</td>
+          <td class="amt balance-cell" id="sumBalance">¥0.00</td>
+          <td></td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <!-- 移动：卡片列表 -->
+  <div class="card-list" id="cardList"></div>
+
+  <!-- 移动端合计 -->
+  <div class="card-sum" id="cardSum" style="display:none;">
+    <div class="lab">合计</div>
+    <div class="grid">
+      <div class="item"><div class="k">总收入</div><div class="v income" id="mSumIncome">¥0.00</div></div>
+      <div class="item"><div class="k">总卡账</div><div class="v cardv" id="mSumCard">¥0.00</div></div>
+      <div class="item"><div class="k">总余额</div><div class="v balance" id="mSumBalance">¥0.00</div></div>
+    </div>
+  </div>
+
   <div class="empty" id="emptyTip" style="display:none;">还没有记录，点击右上角「＋ 新增」开始记录吧～</div>
 </div>
 
@@ -287,9 +372,12 @@ async function load() {
 
 function render() {
   const tbody = document.getElementById('listBody');
+  const clist = document.getElementById('cardList');
   tbody.innerHTML = '';
+  clist.innerHTML = '';
 
   records.forEach(r => {
+    // 桌面表格行
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="date-cell">${r.date}</td>
@@ -305,16 +393,51 @@ function render() {
       </td>
     `;
     tbody.appendChild(tr);
+
+    // 移动端卡片
+    const card = document.createElement('div');
+    card.className = 'rec-card';
+    card.innerHTML = `
+      <div class="rec-top">
+        <span class="rec-date">${r.date}</span>
+        <span class="source-tag">${r.source}</span>
+      </div>
+      <div class="rec-grid">
+        <div class="cell">
+          <div class="lab">收入</div>
+          <div class="val income">${fmtMoney(r.income)}</div>
+        </div>
+        <div class="cell">
+          <div class="lab">卡账</div>
+          <div class="val cardv">${fmtMoney(r.card)}</div>
+        </div>
+        <div class="cell">
+          <div class="lab">余额</div>
+          <div class="val balance">${fmtMoney(r.balance)}</div>
+        </div>
+      </div>
+      <div class="rec-actions">
+        <button class="edit-btn" onclick="editRecord(${r.id})">编辑</button>
+        <button class="del-btn" onclick="askDelete(${r.id})">删除</button>
+      </div>
+    `;
+    clist.appendChild(card);
   });
 
   // 合计
   const sumIncome = records.reduce((s, r) => s + r.income, 0);
   const sumCard = records.reduce((s, r) => s + r.card, 0);
   const sumBalance = computeBalance(sumIncome, sumCard);
+
   document.getElementById('sumIncome').textContent = fmtMoney(sumIncome);
   document.getElementById('sumCard').textContent = fmtMoney(sumCard);
   document.getElementById('sumBalance').textContent = fmtMoney(sumBalance);
   document.getElementById('sumFoot').style.display = records.length ? 'table-footer-group' : 'none';
+
+  document.getElementById('mSumIncome').textContent = fmtMoney(sumIncome);
+  document.getElementById('mSumCard').textContent = fmtMoney(sumCard);
+  document.getElementById('mSumBalance').textContent = fmtMoney(sumBalance);
+  document.getElementById('cardSum').style.display = records.length ? 'block' : 'none';
 
   document.getElementById('emptyTip').style.display = records.length ? 'none' : 'block';
 }
@@ -434,7 +557,7 @@ function closeConfirm() {
 async function doDelete() {
   const id = pendingDeleteId;
   closeConfirm();
-  if (id == null || deleting) return; // 防重复点击
+  if (id == null || deleting) return;
   deleting = true;
   const btn = document.getElementById('confirmDelBtn');
   if (btn) { btn.disabled = true; btn.textContent = '删除中…'; }
