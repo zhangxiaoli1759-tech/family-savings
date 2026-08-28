@@ -81,6 +81,11 @@
   .card-cell { color: #2f6fed; }
   .balance-cell { color: var(--text); font-weight: 700; }
   .deposit-cell { color: var(--primary-dark); font-weight: 700; }
+  .rate-tag {
+    display: inline-block; margin-left: 5px; padding: 1px 6px; border-radius: 8px;
+    font-size: 11px; font-weight: 600; background: #fff2e2; color: var(--primary-dark);
+    vertical-align: middle;
+  }
   .source-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; background: #f2eee8; color: var(--text-light); white-space: nowrap; }
   .action-btns { display: flex; gap: 8px; justify-content: flex-end; }
   tfoot td {
@@ -294,9 +299,18 @@
       <div class="error-tip" id="tipCard">请输入正确的卡账</div>
     </div>
 
+    <div class="field">
+      <label>存款比例</label>
+      <select id="fRate" onchange="updateBalanceHint()">
+        <option value="0.8">80%</option>
+        <option value="0.9" selected>90%</option>
+        <option value="1">100%</option>
+      </select>
+    </div>
+
     <div class="balance-hint">
       <div>本笔余额：<b id="balanceHint">¥0.00</b>（收入 − 卡账）</div>
-      <div style="margin-top:5px;">本笔存款：<b id="depositHint">¥0.00</b>（余额 × 90%）</div>
+      <div style="margin-top:5px;">本笔存款：<b id="depositHint">¥0.00</b>（余额 × <span id="rateHint">90%</span>）</div>
       <div style="font-size:11px; margin-top:5px;">两项均自动计算，不可修改</div>
     </div>
 
@@ -344,8 +358,8 @@ function fmtMoney(n) {
   return '¥' + num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// note 字段存 JSON：{"card": 6500, "save": 5670}
-//   card = 卡账，save = 存款（存款也落库，非仅前端计算）
+// note 字段存 JSON：{"card": 6500, "save": 5670, "rate": 0.9, "sid": 12}
+//   card = 卡账，save = 存款（落库，非仅前端计算），rate = 存款比例，sid = 联动存款表记录 id
 function parseNote(note) {
   if (!note) return {};
   try {
@@ -360,9 +374,21 @@ function computeBalance(income, card) {
   return (Number(income) || 0) - (Number(card) || 0);
 }
 
-// 存款 = 余额 × 90%（保留两位小数）
-function computeDeposit(balance) {
-  return Math.round((Number(balance) || 0) * 0.9 * 100) / 100;
+// 默认存款比例 90%
+const DEFAULT_RATE = 0.9;
+
+// 存款 = 余额 × 比例（保留两位小数）；比例缺省按 90%
+function computeDeposit(balance, rate) {
+  const r = (rate === null || rate === undefined || rate === '') ? DEFAULT_RATE : Number(rate);
+  const rr = (isNaN(r) || r <= 0) ? DEFAULT_RATE : r;
+  return Math.round((Number(balance) || 0) * rr * 100) / 100;
+}
+
+// 比例 -> 展示文案，如 0.9 -> "90%"
+function fmtRate(rate) {
+  const r = (rate === null || rate === undefined || rate === '') ? DEFAULT_RATE : Number(rate);
+  if (isNaN(r) || r <= 0) return Math.round(DEFAULT_RATE * 100) + '%';
+  return Math.round(r * 100) + '%';
 }
 
 // 联动写入存款表 savings_records：
@@ -398,10 +424,21 @@ async function load() {
     const n = parseNote(r.note);
     const card = Number(n.card) || 0;
     const balance = computeBalance(income, card);
-    // 优先取库中已存的存款，缺失时（历史数据）按公式补算
-    const deposit = (n.save != null && n.save !== '') ? Number(n.save) : computeDeposit(balance);
+    // 比例：库里有就用库里的（历史数据缺省按 90%）
+    const hasRate = (n.rate !== undefined && n.rate !== null && n.rate !== '');
+    const rate = hasRate ? Number(n.rate) : DEFAULT_RATE;
+    // 有比例则以「余额 × 比例」重算，保证永远自洽；
+    // 无比例的历史数据沿用已存存款，再兜底按默认比例补算
+    let deposit;
+    if (hasRate) {
+      deposit = computeDeposit(balance, rate);
+    } else if (n.save !== undefined && n.save !== null && n.save !== '') {
+      deposit = Number(n.save);
+    } else {
+      deposit = computeDeposit(balance, rate);
+    }
     // sid = 联动写入存款表(savings_records)的那条记录 id，用于编辑时更新、删除时联动清理
-    return { id: r.id, date: r.date, income, card, balance, deposit, source: r.source, sid: n.sid || null };
+    return { id: r.id, date: r.date, income, card, balance, deposit, rate, source: r.source, sid: n.sid || null };
   });
   document.getElementById('syncTip').textContent = '已同步 · 共 ' + records.length + ' 条';
   render();
@@ -421,7 +458,7 @@ function render() {
       <td class="amount-cell income-cell">${fmtMoney(r.income)}</td>
       <td class="amount-cell card-cell">${fmtMoney(r.card)}</td>
       <td class="amount-cell balance-cell">${fmtMoney(r.balance)}</td>
-      <td class="amount-cell deposit-cell">${fmtMoney(r.deposit)}</td>
+      <td class="amount-cell deposit-cell">${fmtMoney(r.deposit)}<span class="rate-tag">${fmtRate(r.rate)}</span></td>
       <td><span class="source-tag">${r.source}</span></td>
       <td>
         <div class="action-btns">
@@ -454,7 +491,7 @@ function render() {
           <div class="val balance">${fmtMoney(r.balance)}</div>
         </div>
         <div class="cell hl">
-          <div class="lab">存款（×90%）</div>
+          <div class="lab">存款（×${fmtRate(r.rate)}）</div>
           <div class="val deposit">${fmtMoney(r.deposit)}</div>
         </div>
       </div>
@@ -490,9 +527,11 @@ function render() {
 function updateBalanceHint() {
   const income = Number(document.getElementById('fIncome').value) || 0;
   const card = Number(document.getElementById('fCard').value) || 0;
+  const rate = document.getElementById('fRate').value;
   const balance = computeBalance(income, card);
   document.getElementById('balanceHint').textContent = fmtMoney(balance);
-  document.getElementById('depositHint').textContent = fmtMoney(computeDeposit(balance));
+  document.getElementById('depositHint').textContent = fmtMoney(computeDeposit(balance, rate));
+  document.getElementById('rateHint').textContent = fmtRate(rate);
 }
 
 function openModal() {
@@ -503,6 +542,7 @@ function openModal() {
   document.getElementById('fDate').value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
   document.getElementById('fIncome').value = '';
   document.getElementById('fCard').value = '';
+  document.getElementById('fRate').value = String(DEFAULT_RATE);
   document.getElementById('fSource').value = '妈妈';
   updateBalanceHint();
   hideTips();
@@ -517,6 +557,7 @@ function editRecord(id) {
   document.getElementById('fDate').value = record.date;
   document.getElementById('fIncome').value = record.income;
   document.getElementById('fCard').value = record.card;
+  document.getElementById('fRate').value = String(record.rate != null ? record.rate : DEFAULT_RATE);
   document.getElementById('fSource').value = record.source;
   updateBalanceHint();
   hideTips();
@@ -539,6 +580,7 @@ async function saveRecord() {
   const date = document.getElementById('fDate').value;
   const incomeStr = document.getElementById('fIncome').value.trim();
   const cardStr = document.getElementById('fCard').value.trim();
+  const rate = Number(document.getElementById('fRate').value) || DEFAULT_RATE;
   const source = document.getElementById('fSource').value;
 
   let ok = true;
@@ -554,9 +596,9 @@ async function saveRecord() {
   if (!ok) return;
 
   // 余额 = 收入 − 卡账（自动计算，不入库）
-  // 存款 = 余额 × 90%（自动计算，落库保存）
+  // 存款 = 余额 × 所选比例（自动计算，比例与结果均落库）
   const balance = computeBalance(income, card);
-  const deposit = computeDeposit(balance);
+  const deposit = computeDeposit(balance, rate);
 
   // 联动写入存款表：新增则插入，编辑则更新之前那条（避免重复累积）
   const existing = editingId ? records.find(r => r.id === editingId) : null;
@@ -572,7 +614,8 @@ async function saveRecord() {
     amount: income,                                        // 收入
     type: '个人',
     source,
-    note: JSON.stringify({ card, save: deposit, sid: sres.id })  // 卡账 + 存款 + 联动记录 id
+    // 卡账 + 存款 + 存款比例 + 联动记录 id
+    note: JSON.stringify({ card, save: deposit, rate, sid: sres.id })
   };
 
   submitting = true;
