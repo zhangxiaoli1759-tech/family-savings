@@ -50,6 +50,7 @@
     padding: 14px 16px; box-shadow: var(--shadow);
     display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   }
+  .year-pick { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
   .year-bar label { font-size: 12px; color: var(--text-light); white-space: nowrap; }
   .year-bar select {
     flex: 0 0 auto; width: 130px; min-width: 0; min-height: 34px;
@@ -185,8 +186,10 @@
 </div>
 
 <div class="year-bar">
-  <label for="yearSel">选择年份</label>
-  <select id="yearSel"></select>
+  <div class="year-pick">
+    <label for="yearSel">选择年份</label>
+    <select id="yearSel"></select>
+  </div>
   <div class="year-summary">
     <div class="lab">年度结余</div>
     <div class="val" id="yearTotal">¥ 0.00</div>
@@ -259,17 +262,23 @@ function shortMoney(n) {
   return sign + '¥' + Math.round(abs).toLocaleString('zh-CN');
 }
 
-// 年份下拉：当前年前后各 5 年
-function buildYearSelect() {
+// 年份下拉：从 savings_records 实际数据里提取所有年份（去重、降序），系统有什么就展示什么
+async function buildYearSelect() {
   const sel = document.getElementById('yearSel');
-  const cur = new Date().getFullYear();
-  for (let y = cur - 5; y <= cur + 5; y++) {
-    const o = document.createElement('option');
-    o.value = y; o.textContent = y + ' 年';
-    if (y === cur) o.selected = true;
-    sel.appendChild(o);
-  }
+  const cur = String(new Date().getFullYear());
+  let years = [];
+  try {
+    const { data, error } = await supabaseClient.from('savings_records').select('date');
+    if (!error && data) {
+      years = [...new Set(data.map(r => (r.date || '').substring(0, 4)).filter(Boolean))].sort().reverse();
+    }
+  } catch (e) { /* 网络异常时走兜底 */ }
+  if (years.length === 0) years = [cur]; // 库为空时兜底当前年
+  sel.innerHTML = years.map(y => '<option value="' + y + '">' + y + ' 年</option>').join('');
+  // 默认：当前年有数据就选当前年；否则选最新有数据的年份
+  sel.value = years.includes(cur) ? cur : String(years[0]);
   sel.addEventListener('change', () => load(sel.value));
+  load(sel.value);
 }
 
 async function load(year) {
@@ -312,19 +321,22 @@ async function load(year) {
 function renderChart(months) {
   const chart = document.getElementById('chart');
   chart.innerHTML = '';
-  const maxAbs = Math.max(1, ...months.map(m => Math.abs(m.remain)));
+  // 只展示有数据的月份（in/out 任一非 0），不预占全年空柱
+  const list = months.filter(m => m.in !== 0 || m.out !== 0);
+  if (list.length === 0) {
+    chart.innerHTML = '<div class="empty">该年暂无记录</div>';
+    return;
+  }
+  const maxAbs = Math.max(1, ...list.map(m => Math.abs(m.remain)));
   const maxBar = 150; // px
 
-  months.forEach(m => {
+  list.forEach(m => {
     const col = document.createElement('div');
     col.className = 'bar-col';
     const h = Math.max(2, Math.round((Math.abs(m.remain) / maxAbs) * maxBar));
     const cls = m.remain >= 0 ? 'in' : 'out';
-    const emptyMonth = m.in === 0 && m.out === 0;
     // tooltip：该月收入、支出明细（hover 桌面 / 点击移动端）
-    const tip = emptyMonth
-      ? '<div class="bar-tip"><b>' + m.label + '</b><br>该月无记录</div>'
-      : '<div class="bar-tip"><b>' + m.label + '</b><br>收入 <span class="tip-in">' + fmtMoney(m.in) + '</span><br>支出 <span class="tip-out">' + fmtMoney(m.out) + '</span></div>';
+    const tip = '<div class="bar-tip"><b>' + m.label + '</b><br>收入 <span class="tip-in">' + fmtMoney(m.in) + '</span><br>支出 <span class="tip-out">' + fmtMoney(m.out) + '</span></div>';
     col.innerHTML = `
       <div class="bar-val">${m.remain === 0 ? '' : shortMoney(m.remain)}</div>
       <div class="bar ${cls}" style="height:${h}px">${tip}</div>
@@ -411,7 +423,6 @@ document.addEventListener('click', function (e) {
 });
 
 buildYearSelect();
-load(new Date().getFullYear());
 </script>
 </body>
 </html>
