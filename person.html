@@ -130,11 +130,6 @@
   }
   .source-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; background: #f2eee8; color: var(--text-light); white-space: nowrap; }
   .action-btns { display: flex; gap: 8px; justify-content: flex-end; }
-  tfoot td {
-    padding: 13px 14px; background: #fdf8f1; font-weight: 700; font-size: 13px;
-    border-top: 2px solid var(--border); color: var(--text);
-  }
-  tfoot .amt { text-align: right; font-variant-numeric: tabular-nums; }
 
   /* 移动：卡片列表 */
   .card-list { display: block; }
@@ -326,17 +321,6 @@
       <tbody id="listBody">
         <tr><td colspan="7" class="loading">加载中…</td></tr>
       </tbody>
-      <tfoot id="sumFoot" style="display:none;">
-        <tr>
-          <td>合计</td>
-          <td class="amt income-cell" id="sumIncome">¥0.00</td>
-          <td class="amt card-cell" id="sumCard">¥0.00</td>
-          <td class="amt balance-cell" id="sumBalance">¥0.00</td>
-          <td class="amt deposit-cell" id="sumDeposit">¥0.00</td>
-          <td></td>
-          <td></td>
-        </tr>
-      </tfoot>
     </table>
   </div>
 
@@ -609,13 +593,6 @@ function render() {
   document.getElementById('statMonths').textContent = list.length ? '覆盖 ' + list.length + ' 个月' : '';
   document.getElementById('filterCount').textContent =
     currentFilter ? (list.length + ' / ' + records.length + ' 条') : (records.length + ' 条');
-
-  // 列表底部合计
-  document.getElementById('sumIncome').textContent = fmtMoney(sumIncome);
-  document.getElementById('sumCard').textContent = fmtMoney(sumCard);
-  document.getElementById('sumBalance').textContent = fmtMoney(sumBalance);
-  document.getElementById('sumDeposit').textContent = fmtMoney(sumDeposit);
-  document.getElementById('sumFoot').style.display = list.length ? 'table-footer-group' : 'none';
 
   document.getElementById('mSumIncome').textContent = fmtMoney(sumIncome);
   document.getElementById('mSumCard').textContent = fmtMoney(sumCard);
