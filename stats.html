@@ -2,7 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>年度分析 · 家庭存钱计划</title>
 <script src="supabase-js.min.js"></script>
 <style>
@@ -18,137 +19,142 @@
     --border: #eee6dc;
     --shadow: 0 4px 16px rgba(120, 90, 40, .08);
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
-  body { background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
+  * {
+    margin: 0; padding: 0; box-sizing: border-box;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    overflow-x: hidden;
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  }
 
   .header {
     background: linear-gradient(135deg, #ffb457, #ff8c42);
     color: #fff;
-    padding: 24px 24px 52px;
+    padding: calc(22px + env(safe-area-inset-top)) 18px 54px;
     border-radius: 0 0 28px 28px;
   }
   .header a.back {
     display: inline-flex; align-items: center; gap: 4px;
     color: #fff; text-decoration: none; font-size: 13px; opacity: .95;
-    background: rgba(255,255,255,.2); padding: 5px 12px; border-radius: 14px;
+    background: rgba(255,255,255,.2); padding: 7px 12px; border-radius: 14px;
   }
   .header h1 { font-size: 20px; font-weight: 700; margin-top: 14px; }
-  .header p { font-size: 13px; opacity: .9; margin-top: 4px; }
+  .header p { font-size: 13px; opacity: .9; margin-top: 6px; }
 
   .year-bar {
-    background: var(--card);
-    margin: -36px 16px 16px;
-    border-radius: 16px;
-    padding: 16px 18px;
-    box-shadow: var(--shadow);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    background: var(--card); margin: -36px 14px 16px; border-radius: 16px;
+    padding: 14px 16px; box-shadow: var(--shadow);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   }
-  .year-bar label { font-size: 14px; color: var(--text-light); }
+  .year-bar label { font-size: 14px; color: var(--text-light); white-space: nowrap; }
   .year-bar select {
-    flex: 1;
-    padding: 10px 12px;
-    border: 1.5px solid var(--border);
-    border-radius: 10px;
-    font-size: 15px;
-    background: #fff;
-    color: var(--text);
-    outline: none;
+    flex: 1 1 120px; min-width: 0; min-height: 44px;
+    padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 10px;
+    font-size: 16px; /* 16px 防 iOS 聚焦自动放大 */
+    background: #fff; color: var(--text); outline: none;
     appearance: none; -webkit-appearance: none;
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238c8177' stroke-width='2' fill='none'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    padding-right: 34px;
+    background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px;
   }
-  .year-summary {
-    text-align: right;
-  }
+  .year-summary { text-align: right; }
   .year-summary .lab { font-size: 12px; color: var(--text-light); }
-  .year-summary .val { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .year-summary .val { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
   .card {
-    background: var(--card);
-    margin: 0 16px 16px;
-    border-radius: 16px;
-    box-shadow: var(--shadow);
-    padding: 18px 16px 8px;
+    background: var(--card); margin: 0 14px 16px; border-radius: 16px;
+    box-shadow: var(--shadow); padding: 16px 14px 10px;
   }
-  .card h2 { font-size: 15px; margin-bottom: 14px; padding-left: 4px; }
+  .card h2 { font-size: 15px; margin-bottom: 12px; padding-left: 4px; }
+  .hint { font-size: 11px; color: var(--text-light); margin: -6px 0 8px 4px; }
 
-  /* 柱状图 */
+  /* 柱状图：移动端可横向滚动 */
+  .chart-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .chart {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-around;
-    gap: 4px;
-    height: 230px;
-    padding: 10px 4px 0;
+    display: flex; align-items: flex-end; justify-content: space-around;
+    gap: 4px; height: 210px; padding: 10px 4px 0;
     border-bottom: 2px solid var(--border);
   }
   .bar-col {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-end;
-    height: 100%;
-    min-width: 0;
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: flex-end; height: 100%; min-width: 0;
   }
   .bar-val {
-    font-size: 10px;
-    font-variant-numeric: tabular-nums;
-    margin-bottom: 4px;
-    white-space: nowrap;
-    color: var(--text-light);
+    font-size: 10px; font-variant-numeric: tabular-nums; margin-bottom: 4px;
+    white-space: nowrap; color: var(--text-light);
   }
   .bar {
-    width: 70%;
-    max-width: 26px;
-    border-radius: 6px 6px 0 0;
-    transition: height .4s ease;
-    min-height: 2px;
+    width: 70%; max-width: 26px; border-radius: 6px 6px 0 0;
+    transition: height .4s ease; min-height: 2px;
   }
   .bar.in { background: linear-gradient(180deg, #ff7a66, var(--income)); }
   .bar.out { background: linear-gradient(180deg, #5fd08a, var(--expense)); }
   .bar-label {
-    margin-top: 8px;
-    font-size: 11px;
-    color: var(--text-light);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+    margin-top: 8px; font-size: 11px; color: var(--text-light);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
   }
 
-  /* 统计表 */
+  /* 桌面：表格 */
+  .table-view { display: none; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   thead th {
-    text-align: right;
-    padding: 11px 12px;
-    background: #fdf8f1;
-    color: var(--text-light);
-    font-size: 12px;
-    font-weight: 600;
-    border-bottom: 1px solid var(--border);
+    text-align: right; padding: 11px 12px; background: #fdf8f1; color: var(--text-light);
+    font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border);
   }
   thead th:first-child { text-align: left; }
   tbody td {
-    padding: 12px;
-    border-bottom: 1px solid var(--border);
-    text-align: right;
-    font-variant-numeric: tabular-nums;
+    padding: 12px; border-bottom: 1px solid var(--border);
+    text-align: right; font-variant-numeric: tabular-nums;
   }
   tbody td:first-child { text-align: left; }
   tbody tr:last-child td { border-bottom: none; }
-  tbody tr.total-row {
-    background: #fdf8f1;
-    font-weight: 700;
-  }
+  tbody tr.total-row { background: #fdf8f1; font-weight: 700; }
   .num.in { color: var(--income); }
   .num.out { color: var(--expense); }
 
-  .empty { text-align: center; padding: 40px 0; color: var(--text-light); font-size: 14px; }
-  .loading { text-align:center; padding: 30px; color: var(--text-light); font-size: 14px; }
+  /* 移动：月度卡片 */
+  .card-list { display: block; }
+  .month-item { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .month-item:last-child { border-bottom: none; }
+  .month-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+  .month-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .month-grid .cell { background: #fdf8f1; border-radius: 10px; padding: 7px 4px; text-align: center; }
+  .month-grid .lab { font-size: 11px; color: var(--text-light); }
+  .month-grid .val {
+    font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .month-grid .val.in { color: var(--income); }
+  .month-grid .val.out { color: var(--expense); }
+  .month-grid .val.remain-in { color: var(--income); }
+  .month-grid .val.remain-out { color: var(--expense); }
+  .card-sum { display: block; padding: 13px 14px; background: #fdf8f1; border-top: 2px solid var(--border); }
+  .card-sum .lab { font-size: 12px; color: var(--text-light); margin-bottom: 8px; }
+  .card-sum .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .card-sum .item { background: #fff; border-radius: 10px; padding: 7px 4px; text-align: center; }
+  .card-sum .k { font-size: 11px; color: var(--text-light); }
+  .card-sum .v {
+    font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .card-sum .v.in { color: var(--income); }
+  .card-sum .v.out { color: var(--expense); }
+
+  .empty { text-align: center; padding: 38px 18px; color: var(--text-light); font-size: 14px; }
+  .loading { text-align: center; padding: 30px; color: var(--text-light); font-size: 14px; }
+
+  /* 窄屏：柱状图横向滚动，保证 12 根柱可读 */
+  @media (max-width: 720px) {
+    .chart { min-width: 560px; }
+    .year-summary { text-align: left; }
+  }
+  @media (min-width: 721px) {
+    .table-view { display: block; }
+    .card-list, .card-sum { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -170,24 +176,46 @@
 
 <div class="card">
   <h2>月度柱状图（合计剩余资金）</h2>
-  <div class="chart" id="chart"><div class="loading">加载中…</div></div>
+  <div class="hint" id="chartHint">← 左右滑动查看全年 →</div>
+  <div class="chart-scroll">
+    <div class="chart" id="chart"><div class="loading">加载中…</div></div>
+  </div>
 </div>
 
 <div class="card">
   <h2>月度统计表</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>月份</th>
-        <th>存入合计</th>
-        <th>支出合计</th>
-        <th>剩余资金</th>
-      </tr>
-    </thead>
-    <tbody id="tableBody">
-      <tr><td colspan="4" class="loading">加载中…</td></tr>
-    </tbody>
-  </table>
+
+  <!-- 桌面：表格 -->
+  <div class="table-view">
+    <table>
+      <thead>
+        <tr>
+          <th>月份</th>
+          <th>存入合计</th>
+          <th>支出合计</th>
+          <th>剩余资金</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="4" class="loading">加载中…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 移动：月度卡片 -->
+  <div class="card-list" id="cardList"></div>
+
+  <!-- 移动端合计 -->
+  <div class="card-sum" id="cardSum" style="display:none;">
+    <div class="lab">年度合计</div>
+    <div class="grid">
+      <div class="item"><div class="k">存入合计</div><div class="v in" id="mSumIn">¥0.00</div></div>
+      <div class="item"><div class="k">支出合计</div><div class="v out" id="mSumOut">¥0.00</div></div>
+      <div class="item"><div class="k">年度结余</div><div class="v" id="mSumRemain">¥0.00</div></div>
+    </div>
+  </div>
+
+  <div class="empty" id="emptyTip" style="display:none;">该年份暂无记录</div>
 </div>
 
 <script>
@@ -199,6 +227,17 @@ function fmtMoney(n) {
   const num = Number(n) || 0;
   const s = Math.abs(num).toLocaleString('zh-CN', { minimumFractionDigits: 2 });
   return (num < 0 ? '-¥' : '¥') + s;
+}
+
+// 图表用缩写金额，避免窄屏标签互相重叠（如 ¥1.3万）
+function shortMoney(n) {
+  const num = Number(n) || 0;
+  const abs = Math.abs(num);
+  const sign = num < 0 ? '-' : '';
+  if (abs >= 10000) {
+    return sign + '¥' + (abs / 10000).toFixed(1).replace(/\.0$/, '') + '万';
+  }
+  return sign + '¥' + Math.round(abs).toLocaleString('zh-CN');
 }
 
 // 年份下拉：当前年前后各 5 年
@@ -248,13 +287,14 @@ async function load(year) {
 
   renderChart(months);
   renderTable(months, yearRemain);
+  renderCards(months, yearRemain);
 }
 
 function renderChart(months) {
   const chart = document.getElementById('chart');
   chart.innerHTML = '';
   const maxAbs = Math.max(1, ...months.map(m => Math.abs(m.remain)));
-  const maxBar = 170; // px
+  const maxBar = 150; // px
 
   months.forEach(m => {
     const col = document.createElement('div');
@@ -262,7 +302,7 @@ function renderChart(months) {
     const h = Math.max(2, Math.round((Math.abs(m.remain) / maxAbs) * maxBar));
     const cls = m.remain >= 0 ? 'in' : 'out';
     col.innerHTML = `
-      <div class="bar-val">${m.remain === 0 ? '' : fmtMoney(m.remain)}</div>
+      <div class="bar-val">${m.remain === 0 ? '' : shortMoney(m.remain)}</div>
       <div class="bar ${cls}" style="height:${h}px"></div>
       <div class="bar-label">${m.label}</div>
     `;
@@ -296,6 +336,47 @@ function renderTable(months, yearRemain) {
     <td class="num ${yearRemain >= 0 ? 'in' : 'out'}">${fmtMoney(yearRemain)}</td>
   `;
   tb.appendChild(tr);
+}
+
+function renderCards(months, yearRemain) {
+  const clist = document.getElementById('cardList');
+  clist.innerHTML = '';
+
+  const hasData = !months.every(m => m.remain === 0 && m.in === 0 && m.out === 0);
+  document.getElementById('emptyTip').style.display = hasData ? 'none' : 'block';
+  document.getElementById('cardSum').style.display = hasData ? 'block' : 'none';
+  if (!hasData) return;
+
+  months.forEach(m => {
+    const div = document.createElement('div');
+    div.className = 'month-item';
+    div.innerHTML = `
+      <div class="month-title">${m.label}</div>
+      <div class="month-grid">
+        <div class="cell">
+          <div class="lab">存入</div>
+          <div class="val in">${fmtMoney(m.in)}</div>
+        </div>
+        <div class="cell">
+          <div class="lab">支出</div>
+          <div class="val out">${fmtMoney(m.out)}</div>
+        </div>
+        <div class="cell">
+          <div class="lab">剩余</div>
+          <div class="val ${m.remain >= 0 ? 'remain-in' : 'remain-out'}">${fmtMoney(m.remain)}</div>
+        </div>
+      </div>
+    `;
+    clist.appendChild(div);
+  });
+
+  const sumIn = months.reduce((s, m) => s + m.in, 0);
+  const sumOut = months.reduce((s, m) => s + m.out, 0);
+  document.getElementById('mSumIn').textContent = fmtMoney(sumIn);
+  document.getElementById('mSumOut').textContent = fmtMoney(sumOut);
+  const mr = document.getElementById('mSumRemain');
+  mr.textContent = fmtMoney(yearRemain);
+  mr.style.color = yearRemain >= 0 ? 'var(--income)' : 'var(--expense)';
 }
 
 buildYearSelect();
