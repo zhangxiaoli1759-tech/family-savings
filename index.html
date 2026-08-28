@@ -107,6 +107,14 @@
   }
   .filter-clear:hover { background: #e9e0d4; }
   .filter-clear:active { opacity: .7; }
+  .filter-reset {
+    flex: 0 0 auto; align-self: flex-end;
+    border: 1.5px solid var(--border); background: #fff; color: var(--text-light);
+    font-size: 14px; padding: 0 16px; min-height: 40px; border-radius: 10px;
+    cursor: pointer; white-space: nowrap;
+  }
+  .filter-reset:hover { background: #f7f1ea; color: var(--primary-dark); border-color: var(--primary); }
+  .filter-reset:active { opacity: .7; }
   @media (min-width: 721px) {
     .filter-group { max-width: 200px; }
   }
@@ -289,11 +297,11 @@
       <option value="支出">支出</option>
     </select>
   </div>
+  <button class="filter-reset" id="resetBtn" onclick="clearFilters()">重置</button>
 </div>
 
 <div class="filter-info">
   <span id="filterInfo">全部记录 · 0 条</span>
-  <button class="filter-clear" id="clearBtn" onclick="clearFilters()">清除筛选</button>
 </div>
 
 <div class="toolbar">
