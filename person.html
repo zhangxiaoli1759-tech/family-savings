@@ -57,7 +57,49 @@
   .btn-add:hover { background: var(--primary-dark); }
   .btn-add:active { transform: scale(.97); }
 
-  .sync-tip { text-align: center; font-size: 12px; color: var(--text-light); padding: 6px 14px; }
+  /* 来源筛选 */
+  .filter-bar {
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 14px 10px; padding: 9px 12px;
+    background: var(--card); border-radius: 14px; box-shadow: var(--shadow);
+  }
+  .filter-bar label { font-size: 13px; color: var(--text-light); white-space: nowrap; }
+  .filter-bar select {
+    flex: 1; min-width: 0; padding: 8px 30px 8px 10px;
+    border: 1.5px solid var(--border); border-radius: 10px;
+    font-size: 16px; /* 防 iOS 聚焦放大 */
+    min-height: 40px; background: #fff; color: var(--text); outline: none;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238c8177' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+  }
+  .filter-bar select:focus { border-color: var(--primary); }
+  .filter-bar .cnt { font-size: 12px; color: var(--text-light); white-space: nowrap; }
+
+  /* 来源统计面板 */
+  .stat-panel {
+    margin: 0 14px 12px; padding: 14px;
+    background: var(--card); border-radius: 16px; box-shadow: var(--shadow);
+  }
+  .stat-head {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-light); margin-bottom: 10px;
+  }
+  .stat-head b { color: var(--text); font-size: 14px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .stat-item { background: #fdf8f1; border-radius: 12px; padding: 10px 6px; text-align: center; }
+  .stat-item.hl { background: #fff2e2; }
+  .stat-item .k { font-size: 11px; color: var(--text-light); }
+  .stat-item .v {
+    font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .stat-item .v.income { color: var(--income); }
+  .stat-item .v.cardv { color: #2f6fed; }
+  .stat-item .v.balance { color: var(--text); }
+  .stat-item .v.deposit { color: var(--primary-dark); }
+
+  .sync-tip { text-align: center; font-size: 12px; color: var(--text-light); padding: 0 14px 6px; }
 
   .list-wrap {
     background: var(--card); margin: 0 14px; border-radius: 16px;
@@ -209,6 +251,8 @@
     .card-list, .card-sum { display: none; }
     .mask { align-items: center; }
     .modal { border-radius: 20px; max-height: 86vh; }
+    .stat-grid { grid-template-columns: repeat(4, 1fr); }
+    .stat-item .v { font-size: 18px; }
   }
 </style>
 </head>
@@ -223,6 +267,43 @@
 <div class="toolbar">
   <div class="title">个人记录</div>
   <button class="btn-add" onclick="openModal()">＋ 新增</button>
+</div>
+
+<div class="filter-bar">
+  <label for="filterSource">来源</label>
+  <select id="filterSource" onchange="applyFilter()">
+    <option value="">全部来源</option>
+    <option value="爸爸">爸爸</option>
+    <option value="妈妈">妈妈</option>
+    <option value="儿子">儿子</option>
+    <option value="家庭">家庭</option>
+  </select>
+  <span class="cnt" id="filterCount">—</span>
+</div>
+
+<div class="stat-panel">
+  <div class="stat-head">
+    <span>统计范围：<b id="statScope">全部来源</b></span>
+    <span id="statMonths"></span>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-item">
+      <div class="k">总收入</div>
+      <div class="v income" id="sIncome">¥0.00</div>
+    </div>
+    <div class="stat-item">
+      <div class="k">总支出（卡账）</div>
+      <div class="v cardv" id="sCard">¥0.00</div>
+    </div>
+    <div class="stat-item">
+      <div class="k">总余额</div>
+      <div class="v balance" id="sBalance">¥0.00</div>
+    </div>
+    <div class="stat-item hl">
+      <div class="k">总存款</div>
+      <div class="v deposit" id="sDeposit">¥0.00</div>
+    </div>
+  </div>
 </div>
 
 <div class="sync-tip" id="syncTip">数据加载中…</div>
@@ -348,6 +429,7 @@ const SUPABASE_KEY = 'sb_publishable_pbzgGVvgjaSovXpCmp8-qw_AlafRvF6';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let records = [];
+let currentFilter = '';   // 来源筛选：'' = 全部
 let editingId = null;
 let pendingDeleteId = null;
 let submitting = false;
@@ -444,13 +526,22 @@ async function load() {
   render();
 }
 
+// 切换来源筛选
+function applyFilter() {
+  currentFilter = document.getElementById('filterSource').value || '';
+  render();
+}
+
 function render() {
   const tbody = document.getElementById('listBody');
   const clist = document.getElementById('cardList');
   tbody.innerHTML = '';
   clist.innerHTML = '';
 
-  records.forEach(r => {
+  // 按来源筛选（空 = 全部）
+  const list = currentFilter ? records.filter(r => r.source === currentFilter) : records;
+
+  list.forEach(r => {
     // 桌面表格行
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -503,25 +594,43 @@ function render() {
     clist.appendChild(card);
   });
 
-  // 合计
-  const sumIncome = records.reduce((s, r) => s + r.income, 0);
-  const sumCard = records.reduce((s, r) => s + r.card, 0);
-  const sumBalance = records.reduce((s, r) => s + r.balance, 0);
-  const sumDeposit = records.reduce((s, r) => s + Number(r.deposit || 0), 0);
+  // 合计（随筛选结果联动）
+  const sumIncome = list.reduce((s, r) => s + r.income, 0);
+  const sumCard = list.reduce((s, r) => s + r.card, 0);
+  const sumBalance = list.reduce((s, r) => s + r.balance, 0);
+  const sumDeposit = list.reduce((s, r) => s + Number(r.deposit || 0), 0);
 
+  // 顶部来源统计面板
+  document.getElementById('statScope').textContent = currentFilter || '全部来源';
+  document.getElementById('sIncome').textContent = fmtMoney(sumIncome);
+  document.getElementById('sCard').textContent = fmtMoney(sumCard);
+  document.getElementById('sBalance').textContent = fmtMoney(sumBalance);
+  document.getElementById('sDeposit').textContent = fmtMoney(sumDeposit);
+  document.getElementById('statMonths').textContent = list.length ? '覆盖 ' + list.length + ' 个月' : '';
+  document.getElementById('filterCount').textContent =
+    currentFilter ? (list.length + ' / ' + records.length + ' 条') : (records.length + ' 条');
+
+  // 列表底部合计
   document.getElementById('sumIncome').textContent = fmtMoney(sumIncome);
   document.getElementById('sumCard').textContent = fmtMoney(sumCard);
   document.getElementById('sumBalance').textContent = fmtMoney(sumBalance);
   document.getElementById('sumDeposit').textContent = fmtMoney(sumDeposit);
-  document.getElementById('sumFoot').style.display = records.length ? 'table-footer-group' : 'none';
+  document.getElementById('sumFoot').style.display = list.length ? 'table-footer-group' : 'none';
 
   document.getElementById('mSumIncome').textContent = fmtMoney(sumIncome);
   document.getElementById('mSumCard').textContent = fmtMoney(sumCard);
   document.getElementById('mSumBalance').textContent = fmtMoney(sumBalance);
   document.getElementById('mSumDeposit').textContent = fmtMoney(sumDeposit);
-  document.getElementById('cardSum').style.display = records.length ? 'block' : 'none';
+  document.getElementById('cardSum').style.display = list.length ? 'block' : 'none';
 
-  document.getElementById('emptyTip').style.display = records.length ? 'none' : 'block';
+  // 空状态：区分「一条都没有」和「该来源没有」
+  const emptyTip = document.getElementById('emptyTip');
+  emptyTip.style.display = list.length ? 'none' : 'block';
+  if (!list.length) {
+    emptyTip.textContent = records.length
+      ? '「' + currentFilter + '」暂无记录，换个来源看看～'
+      : '还没有记录，点击右上角「＋ 新增」开始记录吧～';
+  }
 }
 
 function updateBalanceHint() {
