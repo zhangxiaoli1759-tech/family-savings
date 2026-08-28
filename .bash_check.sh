@@ -1,0 +1,1 @@
+echo "bash works" && git --version
