@@ -135,6 +135,7 @@
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover { background: #fffaf3; }
   .date-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .amount-head { text-align: right; }
   .amount-cell { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
   .amount-cell.in { color: var(--income); }
   .amount-cell.out { color: var(--expense); }
@@ -318,7 +319,7 @@
       <thead>
         <tr>
           <th>日期</th>
-          <th>金额</th>
+          <th class="amount-head">金额</th>
           <th>方式</th>
           <th>来源</th>
           <th>备注</th>
