@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>家庭存钱计划</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --primary: #ff9f43;
@@ -60,9 +61,6 @@
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 4px;
   }
   .btn-add:hover { background: var(--primary-dark); }
 
@@ -102,6 +100,7 @@
   .edit-btn:hover { color: var(--primary); }
   .del-btn:hover { color: var(--expense); }
   .empty { text-align: center; padding: 48px 0; color: var(--text-light); font-size: 14px; }
+  .sync-tip { text-align: center; font-size: 12px; color: var(--text-light); padding: 6px; }
 
   .footer-total {
     display: flex;
@@ -114,11 +113,7 @@
     font-size: 13px;
     color: var(--text-light);
   }
-  .footer-total .val {
-    font-size: 20px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-  }
+  .footer-total .val { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
   .mask {
     display: none;
@@ -185,6 +180,7 @@
   }
   .btn-confirm:hover { background: var(--primary-dark); }
   .error-tip { color: var(--expense); font-size: 12px; margin-top: 4px; display: none; }
+  .loading { text-align:center; padding: 30px; color: var(--text-light); font-size: 14px; }
 
   @media (min-width: 600px) {
     .mask { align-items: center; }
@@ -196,7 +192,7 @@
 
 <div class="header">
   <h1>🐷 家庭存钱计划</h1>
-  <p>一家人的小金库，一起攒起来</p>
+  <p>一家人的小金库，手机电脑自动同步</p>
 </div>
 
 <div class="summary-card">
@@ -213,6 +209,8 @@
   <button class="btn-add" onclick="openModal()">＋ 新增</button>
 </div>
 
+<div class="sync-tip" id="syncTip">数据加载中…</div>
+
 <div class="list-wrap">
   <table>
     <thead>
@@ -225,9 +223,11 @@
         <th></th>
       </tr>
     </thead>
-    <tbody id="listBody"></tbody>
+    <tbody id="listBody">
+      <tr><td colspan="6" class="loading">加载中…</td></tr>
+    </tbody>
   </table>
-  <div class="empty" id="emptyTip">还没有记录，点击右上角「＋ 新增」开始存钱吧～</div>
+  <div class="empty" id="emptyTip" style="display:none;">还没有记录，点击右上角「＋ 新增」开始存钱吧～</div>
   <div class="footer-total">
     <span>总金额（存入 + / 支出 −）</span>
     <span class="val" id="footerTotal">¥ 0.00</span>
@@ -282,19 +282,13 @@
 </div>
 
 <script>
-const STORAGE_KEY = 'family_savings_records_v1';
+const SUPABASE_URL = 'https://cbnbbrrfbolwvuejoqmk.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_pbzgGVvgjaSovXpCmp8-qw_AlafRvF6';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 let records = [];
 let currentMethod = '存入';
 let editingId = null;
-
-function load() {
-  try { records = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-  catch (e) { records = []; }
-}
-
-function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-}
 
 function fmtMoney(n) {
   const num = Number(n) || 0;
@@ -302,12 +296,35 @@ function fmtMoney(n) {
   return (num < 0 ? '-¥' : '¥') + s;
 }
 
+async function load() {
+  document.getElementById('syncTip').textContent = '数据同步中…';
+  const { data, error } = await supabase
+    .from('savings_records')
+    .select('*')
+    .order('date', { ascending: false });
+
+  if (error) {
+    document.getElementById('syncTip').textContent = '加载失败：' + error.message;
+    console.error(error);
+    return;
+  }
+  records = (data || []).map(r => ({
+    id: r.id,
+    date: r.date,
+    amount: r.amount,
+    method: r.method,
+    source: r.source,
+    note: r.note || ''
+  }));
+  document.getElementById('syncTip').textContent = '已同步 · 共 ' + records.length + ' 条';
+  render();
+}
+
 function render() {
   const tbody = document.getElementById('listBody');
   tbody.innerHTML = '';
-  const sorted = [...records].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
 
-  sorted.forEach(r => {
+  records.forEach(r => {
     const tr = document.createElement('tr');
     const isIn = r.method === '存入';
     tr.innerHTML = `
@@ -388,7 +405,7 @@ function hideTips() {
   document.getElementById('tipAmount').style.display = 'none';
 }
 
-function saveRecord() {
+async function saveRecord() {
   hideTips();
   const date = document.getElementById('fDate').value;
   const amountStr = document.getElementById('fAmount').value.trim();
@@ -403,33 +420,38 @@ function saveRecord() {
   }
   if (!ok) return;
 
+  const payload = { date, amount, method: currentMethod, source, note };
+
+  let res;
   if (editingId) {
-    const record = records.find(r => r.id === editingId);
-    if (record) {
-      record.date = date; record.amount = amount;
-      record.method = currentMethod; record.source = source; record.note = note;
-    }
+    res = await supabase.from('savings_records').update(payload).eq('id', editingId);
   } else {
-    records.push({ id: Date.now(), date, amount, method: currentMethod, source, note });
+    res = await supabase.from('savings_records').insert(payload);
   }
-  persist(); render(); closeModal();
+
+  if (res.error) {
+    alert('保存失败：' + res.error.message);
+    return;
+  }
+  closeModal();
+  await load();
 }
 
-function delRecord(id) {
+async function delRecord(id) {
   if (!confirm('确定删除这条记录吗？')) return;
-  records = records.filter(r => r.id !== id);
-  persist(); render();
+  const { error } = await supabase.from('savings_records').delete().eq('id', id);
+  if (error) { alert('删除失败：' + error.message); return; }
+  await load();
 }
 
 document.getElementById('mask').addEventListener('click', function (e) {
   if (e.target === this) closeModal();
 });
-
 document.getElementById('fAmount').addEventListener('keydown', function (e) {
   if (e.key === 'Enter') saveRecord();
 });
 
-load(); render();
+load();
 </script>
 </body>
 </html>
