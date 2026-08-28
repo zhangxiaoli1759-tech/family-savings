@@ -110,15 +110,15 @@
   .table-view { display: none; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   thead th {
-    text-align: left; padding: 12px 14px; background: #fdf8f1; color: var(--text-light);
+    text-align: center; padding: 12px 14px; background: #fdf8f1; color: var(--text-light);
     font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border);
   }
-  thead th.amt { text-align: right; }
-  tbody td { padding: 13px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  thead th.amt { text-align: center; }
+  tbody td { padding: 13px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; text-align: center; }
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover { background: #fffaf3; }
   .date-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .amount-cell { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .amount-cell { font-weight: 600; font-variant-numeric: tabular-nums; text-align: center; white-space: nowrap; }
   .income-cell { color: var(--income); }
   .card-cell { color: #2f6fed; }
   .balance-cell { color: var(--text); font-weight: 700; }
@@ -129,7 +129,7 @@
     vertical-align: middle;
   }
   .source-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; background: #f2eee8; color: var(--text-light); white-space: nowrap; }
-  .action-btns { display: flex; gap: 8px; justify-content: flex-end; }
+  .action-btns { display: flex; gap: 8px; justify-content: center; }
 
   /* 移动：卡片列表 */
   .card-list { display: block; }
@@ -155,19 +155,6 @@
   .rec-grid .val.balance { color: var(--text); }
   .rec-grid .val.deposit { color: var(--primary-dark); }
   .rec-actions { margin-top: 12px; display: flex; justify-content: flex-end; gap: 10px; }
-
-  /* 移动端合计 */
-  .card-sum { display: block; padding: 14px 15px; background: #fdf8f1; border-top: 2px solid var(--border); }
-  .card-sum .lab { font-size: 12px; color: var(--text-light); margin-bottom: 8px; }
-  .card-sum .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .card-sum .item { background: #fff; border-radius: 10px; padding: 8px 4px; text-align: center; }
-  .card-sum .item.hl { background: #fff2e2; }
-  .card-sum .k { font-size: 11px; color: var(--text-light); }
-  .card-sum .v { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .card-sum .v.income { color: var(--income); }
-  .card-sum .v.cardv { color: #2f6fed; }
-  .card-sum .v.balance { color: var(--text); }
-  .card-sum .v.deposit { color: var(--primary-dark); }
 
   .edit-btn, .del-btn {
     border: none; background: #f7f1ea; border-radius: 8px; font-size: 13px;
@@ -243,7 +230,7 @@
 
   @media (min-width: 721px) {
     .table-view { display: block; }
-    .card-list, .card-sum { display: none; }
+    .card-list { display: none; }
     .mask { align-items: center; }
     .modal { border-radius: 20px; max-height: 86vh; }
     .stat-grid { grid-template-columns: repeat(4, 1fr); }
@@ -324,17 +311,6 @@
 
   <!-- 移动：卡片列表 -->
   <div class="card-list" id="cardList"></div>
-
-  <!-- 移动端合计 -->
-  <div class="card-sum" id="cardSum" style="display:none;">
-    <div class="lab">合计</div>
-    <div class="grid">
-      <div class="item"><div class="k">总收入</div><div class="v income" id="mSumIncome">¥0.00</div></div>
-      <div class="item"><div class="k">总卡账</div><div class="v cardv" id="mSumCard">¥0.00</div></div>
-      <div class="item"><div class="k">总余额</div><div class="v balance" id="mSumBalance">¥0.00</div></div>
-      <div class="item hl"><div class="k">总存款</div><div class="v deposit" id="mSumDeposit">¥0.00</div></div>
-    </div>
-  </div>
 
   <div class="empty" id="emptyTip" style="display:none;">还没有记录，点击上方「＋ 新增」开始记录吧～</div>
 </div>
@@ -591,12 +567,6 @@ function render() {
   document.getElementById('statMonths').textContent = list.length ? '覆盖 ' + list.length + ' 个月' : '';
   document.getElementById('filterCount').textContent =
     currentFilter ? (list.length + ' / ' + records.length + ' 条') : (records.length + ' 条');
-
-  document.getElementById('mSumIncome').textContent = fmtMoney(sumIncome);
-  document.getElementById('mSumCard').textContent = fmtMoney(sumCard);
-  document.getElementById('mSumBalance').textContent = fmtMoney(sumBalance);
-  document.getElementById('mSumDeposit').textContent = fmtMoney(sumDeposit);
-  document.getElementById('cardSum').style.display = list.length ? 'block' : 'none';
 
   // 空状态：区分「一条都没有」和「该来源没有」
   const emptyTip = document.getElementById('emptyTip');
