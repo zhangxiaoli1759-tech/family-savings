@@ -365,6 +365,22 @@ function computeDeposit(balance) {
   return Math.round((Number(balance) || 0) * 0.9 * 100) / 100;
 }
 
+// 联动写入存款表 savings_records：
+//   月份=date、类型=存入、来源=source、金额=存款金额、备注=工资收入
+// 有 sid 则更新原记录（避免重复），无 sid 则新增并返回新 id
+async function syncSavings(sid, date, deposit, source) {
+  const payload = { date, amount: deposit, method: '存入', source, note: '工资收入' };
+  if (sid) {
+    const r = await supabaseClient.from('savings_records').update(payload).eq('id', sid).select('id');
+    if (r.error) return { error: r.error };
+    // 命中则直接返回；若该记录已被手动删除（0 行受影响），往下重新插入，避免静默丢失
+    if (r.data && r.data.length) return { id: sid };
+  }
+  const ins = await supabaseClient.from('savings_records').insert(payload).select('id');
+  if (ins.error) return { error: ins.error };
+  return { id: (ins.data && ins.data[0]) ? ins.data[0].id : null };
+}
+
 async function load() {
   document.getElementById('syncTip').textContent = '数据同步中…';
   const { data, error } = await supabaseClient
@@ -384,7 +400,8 @@ async function load() {
     const balance = computeBalance(income, card);
     // 优先取库中已存的存款，缺失时（历史数据）按公式补算
     const deposit = (n.save != null && n.save !== '') ? Number(n.save) : computeDeposit(balance);
-    return { id: r.id, date: r.date, income, card, balance, deposit, source: r.source };
+    // sid = 联动写入存款表(savings_records)的那条记录 id，用于编辑时更新、删除时联动清理
+    return { id: r.id, date: r.date, income, card, balance, deposit, source: r.source, sid: n.sid || null };
   });
   document.getElementById('syncTip').textContent = '已同步 · 共 ' + records.length + ' 条';
   render();
@@ -541,12 +558,21 @@ async function saveRecord() {
   const balance = computeBalance(income, card);
   const deposit = computeDeposit(balance);
 
+  // 联动写入存款表：新增则插入，编辑则更新之前那条（避免重复累积）
+  const existing = editingId ? records.find(r => r.id === editingId) : null;
+  const sid = existing ? existing.sid : null;
+  const sres = await syncSavings(sid, date, deposit, source);
+  if (sres.error) {
+    alert('存款表同步失败：' + sres.error.message);
+    return;
+  }
+
   const payload = {
     date,
-    amount: income,                              // 收入
+    amount: income,                                        // 收入
     type: '个人',
     source,
-    note: JSON.stringify({ card, save: deposit })  // 卡账 + 存款 存于 note JSON
+    note: JSON.stringify({ card, save: deposit, sid: sres.id })  // 卡账 + 存款 + 联动记录 id
   };
 
   submitting = true;
@@ -597,6 +623,11 @@ async function doDelete() {
   if (btn) { btn.disabled = true; btn.textContent = '删除中…'; }
   let error = null;
   try {
+    // 联动删除：先清掉当初自动生成的存款表记录
+    const rec = records.find(r => r.id === id);
+    if (rec && rec.sid) {
+      await supabaseClient.from('savings_records').delete().eq('id', rec.sid);
+    }
     const r = await supabaseClient.from('personal_records').delete().eq('id', id);
     error = r.error;
   } catch (err) {
