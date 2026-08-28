@@ -35,6 +35,7 @@
     white-space: nowrap;
   }
   .header-analysis:hover { background: rgba(255,255,255,.35); }
+  .header-links { display: flex; gap: 8px; align-items: center; }
   .header p { font-size: 13px; opacity: .9; margin-top: 4px; }
 
   .summary-card {
@@ -220,7 +221,10 @@
 <div class="header">
   <div class="header-title-row">
     <h1>🐷 家庭存钱计划</h1>
-    <a class="header-analysis" href="stats.html">年度分析 ›</a>
+    <div class="header-links">
+      <a class="header-analysis" href="person.html">个人分析 ›</a>
+      <a class="header-analysis" href="stats.html">年度分析 ›</a>
+    </div>
   </div>
   <p>一家人的小金库，手机电脑自动同步</p>
 </div>
