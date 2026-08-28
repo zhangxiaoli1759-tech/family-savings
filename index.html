@@ -28,6 +28,13 @@
     border-radius: 0 0 28px 28px;
   }
   .header h1 { font-size: 22px; font-weight: 700; }
+  .header-title-row { display: flex; justify-content: space-between; align-items: center; }
+  .header-analysis {
+    color: #fff; text-decoration: none; font-size: 14px; font-weight: 600;
+    background: rgba(255,255,255,.25); padding: 5px 12px; border-radius: 14px;
+    white-space: nowrap;
+  }
+  .header-analysis:hover { background: rgba(255,255,255,.35); }
   .header p { font-size: 13px; opacity: .9; margin-top: 4px; }
 
   .summary-card {
@@ -211,7 +218,10 @@
 <body>
 
 <div class="header">
-  <h1>🐷 家庭存钱计划</h1>
+  <div class="header-title-row">
+    <h1>🐷 家庭存钱计划</h1>
+    <a class="header-analysis" href="stats.html">年度分析 ›</a>
+  </div>
   <p>一家人的小金库，手机电脑自动同步</p>
 </div>
 
@@ -251,9 +261,6 @@
   <div class="footer-total">
     <span>总金额（存入 + / 支出 −）</span>
     <span class="val" id="footerTotal">¥ 0.00</span>
-  </div>
-  <div class="analysis-entry">
-    <a href="stats.html">📊 年度分析 ›</a>
   </div>
 </div>
 
