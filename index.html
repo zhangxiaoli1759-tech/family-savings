@@ -2,7 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>家庭存钱计划</title>
 <script src="supabase-js.min.js"></script>
 <style>
@@ -18,78 +19,77 @@
     --border: #eee6dc;
     --shadow: 0 4px 16px rgba(120, 90, 40, .08);
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
-  body { background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
+  * {
+    margin: 0; padding: 0; box-sizing: border-box;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    overflow-x: hidden;
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  }
 
   .header {
     background: linear-gradient(135deg, #ffb457, #ff8c42);
     color: #fff;
-    padding: 28px 24px 56px;
+    padding: calc(22px + env(safe-area-inset-top)) 18px 54px;
     border-radius: 0 0 28px 28px;
   }
-  .header h1 { font-size: 22px; font-weight: 700; }
-  .header-title-row { display: flex; justify-content: space-between; align-items: center; }
+  .header h1 { font-size: 20px; font-weight: 700; }
+  .header-title-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
   .header-analysis {
-    color: #fff; text-decoration: none; font-size: 14px; font-weight: 600;
-    background: rgba(255,255,255,.25); padding: 5px 12px; border-radius: 14px;
+    color: #fff; text-decoration: none; font-size: 13px; font-weight: 600;
+    background: rgba(255,255,255,.25); padding: 7px 12px; border-radius: 14px;
     white-space: nowrap;
   }
   .header-analysis:hover { background: rgba(255,255,255,.35); }
-  .header-links { display: flex; gap: 8px; align-items: center; }
-  .header p { font-size: 13px; opacity: .9; margin-top: 4px; }
+  .header-links { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .header p { font-size: 13px; opacity: .9; margin-top: 8px; }
 
   .summary-card {
     background: var(--card);
-    margin: -36px 16px 16px;
+    margin: -36px 14px 16px;
     border-radius: 16px;
-    padding: 20px;
+    padding: 18px 16px;
     box-shadow: var(--shadow);
     text-align: center;
   }
   .summary-label { font-size: 13px; color: var(--text-light); }
-  .summary-amount { font-size: 36px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .summary-amount { font-size: 32px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
   .summary-amount.plus { color: var(--income); }
   .summary-amount.minus { color: var(--expense); }
-  .summary-sub { display: flex; justify-content: center; gap: 28px; margin-top: 14px; font-size: 13px; color: var(--text-light); }
+  .summary-sub { display: flex; justify-content: center; gap: 22px; margin-top: 12px; font-size: 13px; color: var(--text-light); flex-wrap: wrap; }
   .summary-sub b { color: var(--text); }
 
   .toolbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin: 0 16px 12px;
+    display: flex; justify-content: space-between; align-items: center;
+    margin: 0 14px 10px;
   }
   .toolbar .title { font-size: 16px; font-weight: 600; }
   .btn-add {
-    background: var(--primary);
-    color: #fff;
-    border: none;
-    border-radius: 20px;
-    padding: 9px 18px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
+    background: var(--primary); color: #fff; border: none; border-radius: 22px;
+    padding: 0 20px; min-height: 40px; font-size: 14px; font-weight: 600; cursor: pointer;
   }
   .btn-add:hover { background: var(--primary-dark); }
+  .btn-add:active { transform: scale(.97); }
+
+  .sync-tip { text-align: center; font-size: 12px; color: var(--text-light); padding: 6px 14px; }
 
   .list-wrap {
-    background: var(--card);
-    margin: 0 16px;
-    border-radius: 16px;
-    box-shadow: var(--shadow);
-    overflow: hidden;
+    background: var(--card); margin: 0 14px; border-radius: 16px;
+    box-shadow: var(--shadow); overflow: hidden;
   }
+
+  /* 桌面视图：表格 */
+  .table-view { display: none; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   thead th {
-    text-align: left;
-    padding: 12px 14px;
-    background: #fdf8f1;
-    color: var(--text-light);
-    font-size: 12px;
-    font-weight: 600;
-    border-bottom: 1px solid var(--border);
+    text-align: left; padding: 12px 14px; background: #fdf8f1; color: var(--text-light);
+    font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border);
   }
-  tbody td { padding: 13px 14px; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 13px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover { background: #fffaf3; }
   .date-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -100,129 +100,111 @@
   .tag.in { background: #fdecea; color: var(--income); }
   .tag.out { background: #e8f7ef; color: var(--expense); }
   .source-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; background: #f2eee8; color: var(--text-light); white-space: nowrap; }
-  .note-cell { color: var(--text-light); font-size: 13px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .action-btns { display: flex; gap: 4px; }
+  .note-cell { color: var(--text-light); font-size: 13px; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .action-btns { display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* 移动视图：卡片列表 */
+  .card-list { display: block; }
+  .rec-card { padding: 14px 15px; border-bottom: 1px solid var(--border); }
+  .rec-card:last-child { border-bottom: none; }
+  .rec-card:active { background: #fffaf3; }
+  .rec-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .rec-date { font-size: 13px; color: var(--text-light); font-variant-numeric: tabular-nums; }
+  .rec-amount { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rec-amount.in { color: var(--income); }
+  .rec-amount.out { color: var(--expense); }
+  .rec-tags { margin-top: 9px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .rec-note { margin-top: 8px; font-size: 13px; color: var(--text-light); word-break: break-all; line-height: 1.5; }
+  .rec-actions { margin-top: 12px; display: flex; justify-content: flex-end; gap: 10px; }
+
   .edit-btn, .del-btn {
-    border: none; background: none; color: #ccc; font-size: 16px; cursor: pointer; padding: 2px 6px;
+    border: none; background: #f7f1ea; border-radius: 8px; font-size: 13px;
+    cursor: pointer; padding: 9px 16px; min-height: 38px; white-space: nowrap;
   }
-  .edit-btn:hover { color: var(--primary); }
-  .del-btn:hover { color: var(--expense); }
-  .empty { text-align: center; padding: 48px 0; color: var(--text-light); font-size: 14px; }
-  .sync-tip { text-align: center; font-size: 12px; color: var(--text-light); padding: 6px; }
+  .edit-btn { color: var(--primary-dark); }
+  .edit-btn:hover { background: #fff0e0; }
+  .del-btn { color: var(--expense); }
+  .del-btn:hover { background: #e8f7ef; }
+  .edit-btn:active, .del-btn:active { opacity: .7; }
+
+  .empty { text-align: center; padding: 44px 18px; color: var(--text-light); font-size: 14px; }
 
   .footer-total {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
-    background: #fdf8f1;
-    border-top: 1px solid var(--border);
-    font-size: 13px;
-    color: var(--text-light);
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 14px 16px; background: #fdf8f1; border-top: 1px solid var(--border);
+    font-size: 13px; color: var(--text-light); flex-wrap: wrap;
   }
-  .footer-total .val { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
-
-  .analysis-entry {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    padding: 14px 16px;
-    background: #fdf8f1;
-    border-top: 1px solid var(--border);
-  }
-  .analysis-entry a {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--primary-dark);
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .analysis-entry a:hover { color: var(--primary); }
+  .footer-total .val { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
   .mask {
-    display: none;
-    position: fixed; inset: 0;
-    background: rgba(50, 40, 30, .45);
-    z-index: 100;
-    align-items: flex-end;
-    justify-content: center;
+    display: none; position: fixed; inset: 0; background: rgba(50, 40, 30, .45);
+    z-index: 100; align-items: flex-end; justify-content: center;
   }
   .mask.show { display: flex; }
   .modal {
-    background: var(--card);
-    width: 100%;
-    max-width: 520px;
-    border-radius: 20px 20px 0 0;
-    padding: 22px 20px calc(20px + env(safe-area-inset-bottom));
+    background: var(--card); width: 100%; max-width: 520px; border-radius: 20px 20px 0 0;
+    padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
     animation: slideUp .25s ease;
+    max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
   }
   @keyframes slideUp { from { transform: translateY(60px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
   .modal h3 { font-size: 17px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; }
-  .modal-close { border: none; background: #f2eee8; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; color: var(--text-light); font-size: 14px; }
+  .modal-close { border: none; background: #f2eee8; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: var(--text-light); font-size: 14px; }
   .field { margin-bottom: 16px; }
   .field label { display: block; font-size: 13px; color: var(--text-light); margin-bottom: 6px; }
   .field input, .field select {
-    width: 100%;
-    padding: 11px 12px;
-    border: 1.5px solid var(--border);
-    border-radius: 10px;
-    font-size: 15px;
-    background: #fff;
-    color: var(--text);
-    outline: none;
-    appearance: none;
-    -webkit-appearance: none;
+    width: 100%; padding: 12px; border: 1.5px solid var(--border); border-radius: 10px;
+    font-size: 16px; /* 16px 防 iOS 聚焦自动放大 */
+    min-height: 46px;
+    background: #fff; color: var(--text); outline: none;
+    appearance: none; -webkit-appearance: none;
   }
   .field select {
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238c8177' stroke-width='2' fill='none'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    padding-right: 34px;
+    background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px;
   }
   .field input:focus, .field select:focus { border-color: var(--primary); }
   .method-group { display: flex; gap: 10px; }
   .method-group button {
-    flex: 1;
-    padding: 11px 0;
-    border: 1.5px solid var(--border);
-    border-radius: 10px;
-    background: #fff;
-    font-size: 15px;
-    cursor: pointer;
-    color: var(--text-light);
+    flex: 1; padding: 0; min-height: 46px;
+    border: 1.5px solid var(--border); border-radius: 10px; background: #fff;
+    font-size: 15px; cursor: pointer; color: var(--text-light);
   }
   .method-group button.active-in { border-color: var(--income); color: var(--income); background: #fdecea; font-weight: 600; }
   .method-group button.active-out { border-color: var(--expense); color: var(--expense); background: #e8f7ef; font-weight: 600; }
-  .modal-actions { display: flex; gap: 12px; margin-top: 22px; }
+  .modal-actions { display: flex; gap: 12px; margin-top: 20px; }
   .btn-cancel {
-    flex: 1; padding: 12px 0; border: none; border-radius: 12px;
+    flex: 1; padding: 0; min-height: 46px; border: none; border-radius: 12px;
     background: #f2eee8; color: var(--text-light); font-size: 15px; cursor: pointer;
   }
   .btn-confirm {
-    flex: 2; padding: 12px 0; border: none; border-radius: 12px;
+    flex: 2; padding: 0; min-height: 46px; border: none; border-radius: 12px;
     background: var(--primary); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
   }
   .btn-confirm:hover { background: var(--primary-dark); }
+  .btn-confirm:disabled { background: #f0c9a0; cursor: not-allowed; }
   .error-tip { color: var(--expense); font-size: 12px; margin-top: 4px; display: none; }
-  .loading { text-align:center; padding: 30px; color: var(--text-light); font-size: 14px; }
+  .loading { text-align: center; padding: 30px; color: var(--text-light); font-size: 14px; }
 
   .confirm-box {
-    background: var(--card); width: 84%; max-width: 320px; border-radius: 16px; padding: 24px 20px 18px;
+    background: var(--card); width: 86%; max-width: 320px; border-radius: 16px; padding: 24px 20px 18px;
     text-align: center; animation: slideUp .2s ease;
   }
   .confirm-text { font-size: 15px; color: var(--text); margin-bottom: 22px; line-height: 1.5; }
   .confirm-actions { display: flex; gap: 12px; }
   .confirm-actions .btn-cancel { flex: 1; }
-  .btn-danger { flex: 1; padding: 11px 0; border: none; border-radius: 12px; background: var(--expense); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn-danger {
+    flex: 1; padding: 0; min-height: 44px; border: none; border-radius: 12px;
+    background: var(--expense); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
   .btn-danger:hover { background: #1f9c51; }
 
-  @media (min-width: 600px) {
+  /* 宽屏切换回表格 */
+  @media (min-width: 721px) {
+    .table-view { display: block; }
+    .card-list { display: none; }
     .mask { align-items: center; }
-    .modal { border-radius: 20px; }
+    .modal { border-radius: 20px; max-height: 86vh; }
   }
 </style>
 </head>
@@ -256,21 +238,28 @@
 <div class="sync-tip" id="syncTip">数据加载中…</div>
 
 <div class="list-wrap">
-  <table>
-    <thead>
-      <tr>
-        <th>日期</th>
-        <th>金额</th>
-        <th>方式</th>
-        <th>来源</th>
-        <th>备注</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody id="listBody">
-      <tr><td colspan="6" class="loading">加载中…</td></tr>
-    </tbody>
-  </table>
+  <!-- 桌面：表格 -->
+  <div class="table-view">
+    <table>
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th>金额</th>
+          <th>方式</th>
+          <th>来源</th>
+          <th>备注</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="listBody">
+        <tr><td colspan="6" class="loading">加载中…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 移动：卡片列表 -->
+  <div class="card-list" id="cardList"></div>
+
   <div class="empty" id="emptyTip" style="display:none;">还没有记录，点击右上角「＋ 新增」开始存钱吧～</div>
   <div class="footer-total">
     <span>总金额（存入 + / 支出 −）</span>
@@ -346,6 +335,7 @@ let currentMethod = '存入';
 let editingId = null;
 let pendingDeleteId = null;
 let deleting = false;
+let submitting = false;
 
 function fmtMoney(n) {
   const num = Number(n) || 0;
@@ -379,25 +369,52 @@ async function load() {
 
 function render() {
   const tbody = document.getElementById('listBody');
+  const clist = document.getElementById('cardList');
   tbody.innerHTML = '';
+  clist.innerHTML = '';
 
   records.forEach(r => {
-    const tr = document.createElement('tr');
     const isIn = r.method === '存入';
+    const cls = isIn ? 'in' : 'out';
+    const amtText = (isIn ? '+' : '-') + Number(r.amount).toLocaleString('zh-CN', { minimumFractionDigits: 2 });
+    const note = r.note || '';
+
+    // 桌面表格行
+    const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="date-cell">${r.date}</td>
-      <td class="amount-cell ${isIn ? 'in' : 'out'}">${isIn ? '+' : '-'}${Number(r.amount).toLocaleString('zh-CN', {minimumFractionDigits: 2})}</td>
-      <td><span class="tag ${isIn ? 'in' : 'out'}">${r.method}</span></td>
+      <td class="amount-cell ${cls}">${amtText}</td>
+      <td><span class="tag ${cls}">${r.method}</span></td>
       <td><span class="source-tag">${r.source}</span></td>
-      <td class="note-cell" title="${r.note || ''}">${r.note || '—'}</td>
+      <td class="note-cell" title="${note}">${note || '—'}</td>
       <td>
         <div class="action-btns">
-          <button class="edit-btn" onclick="editRecord(${r.id})" title="编辑">✏️</button>
-          <button class="del-btn" onclick="askDelete(${r.id})" title="删除">🗑</button>
+          <button class="edit-btn" onclick="editRecord(${r.id})">编辑</button>
+          <button class="del-btn" onclick="askDelete(${r.id})">删除</button>
         </div>
       </td>
     `;
     tbody.appendChild(tr);
+
+    // 移动端卡片
+    const card = document.createElement('div');
+    card.className = 'rec-card';
+    card.innerHTML = `
+      <div class="rec-top">
+        <span class="rec-date">${r.date}</span>
+        <span class="rec-amount ${cls}">${amtText}</span>
+      </div>
+      <div class="rec-tags">
+        <span class="tag ${cls}">${r.method}</span>
+        <span class="source-tag">${r.source}</span>
+      </div>
+      ${note ? `<div class="rec-note">${note}</div>` : ''}
+      <div class="rec-actions">
+        <button class="edit-btn" onclick="editRecord(${r.id})">编辑</button>
+        <button class="del-btn" onclick="askDelete(${r.id})">删除</button>
+      </div>
+    `;
+    clist.appendChild(card);
   });
 
   document.getElementById('emptyTip').style.display = records.length ? 'none' : 'block';
@@ -463,6 +480,7 @@ function hideTips() {
 }
 
 async function saveRecord() {
+  if (submitting) return; // 防重复提交
   hideTips();
   const date = document.getElementById('fDate').value;
   const amountStr = document.getElementById('fAmount').value.trim();
@@ -479,11 +497,25 @@ async function saveRecord() {
 
   const payload = { date, amount, method: currentMethod, source, note };
 
+  submitting = true;
+  const btn = document.querySelector('.btn-confirm');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '保存中…';
+
   let res;
-  if (editingId) {
-    res = await supabaseClient.from('savings_records').update(payload).eq('id', editingId);
-  } else {
-    res = await supabaseClient.from('savings_records').insert(payload);
+  try {
+    if (editingId) {
+      res = await supabaseClient.from('savings_records').update(payload).eq('id', editingId);
+    } else {
+      res = await supabaseClient.from('savings_records').insert(payload);
+    }
+  } catch (err) {
+    res = { error: { message: err.message } };
+  } finally {
+    submitting = false;
+    btn.disabled = false;
+    btn.textContent = originalText;
   }
 
   if (res.error) {
