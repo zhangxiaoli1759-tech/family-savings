@@ -210,6 +210,16 @@
   .error-tip { color: var(--expense); font-size: 12px; margin-top: 4px; display: none; }
   .loading { text-align:center; padding: 30px; color: var(--text-light); font-size: 14px; }
 
+  .confirm-box {
+    background: var(--card); width: 84%; max-width: 320px; border-radius: 16px; padding: 24px 20px 18px;
+    text-align: center; animation: slideUp .2s ease;
+  }
+  .confirm-text { font-size: 15px; color: var(--text); margin-bottom: 22px; line-height: 1.5; }
+  .confirm-actions { display: flex; gap: 12px; }
+  .confirm-actions .btn-cancel { flex: 1; }
+  .btn-danger { flex: 1; padding: 11px 0; border: none; border-radius: 12px; background: var(--expense); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn-danger:hover { background: #1f9c51; }
+
   @media (min-width: 600px) {
     .mask { align-items: center; }
     .modal { border-radius: 20px; }
@@ -315,6 +325,17 @@
   </div>
 </div>
 
+<!-- 删除确认弹窗（自定义，避免微信等 webview 屏蔽原生 confirm） -->
+<div class="mask" id="confirmMask">
+  <div class="confirm-box">
+    <div class="confirm-text">确定删除这条记录吗？</div>
+    <div class="confirm-actions">
+      <button class="btn-cancel" onclick="closeConfirm()">取消</button>
+      <button class="btn-danger" id="confirmDelBtn" onclick="doDelete()">删除</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://cbnbbrrfbolwvuejoqmk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_pbzgGVvgjaSovXpCmp8-qw_AlafRvF6';
@@ -323,6 +344,8 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let records = [];
 let currentMethod = '存入';
 let editingId = null;
+let pendingDeleteId = null;
+let deleting = false;
 
 function fmtMoney(n) {
   const num = Number(n) || 0;
@@ -370,7 +393,7 @@ function render() {
       <td>
         <div class="action-btns">
           <button class="edit-btn" onclick="editRecord(${r.id})" title="编辑">✏️</button>
-          <button class="del-btn" onclick="delRecord(${r.id})" title="删除">🗑</button>
+          <button class="del-btn" onclick="askDelete(${r.id})" title="删除">🗑</button>
         </div>
       </td>
     `;
@@ -471,15 +494,42 @@ async function saveRecord() {
   await load();
 }
 
-async function delRecord(id) {
-  if (!confirm('确定删除这条记录吗？')) return;
-  const { error } = await supabaseClient.from('savings_records').delete().eq('id', id);
+function askDelete(id) {
+  pendingDeleteId = id;
+  document.getElementById('confirmMask').classList.add('show');
+}
+
+function closeConfirm() {
+  pendingDeleteId = null;
+  document.getElementById('confirmMask').classList.remove('show');
+}
+
+async function doDelete() {
+  const id = pendingDeleteId;
+  closeConfirm();
+  if (id == null || deleting) return;
+  deleting = true;
+  const btn = document.getElementById('confirmDelBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '删除中…'; }
+  let error = null;
+  try {
+    const r = await supabaseClient.from('savings_records').delete().eq('id', id);
+    error = r.error;
+  } catch (err) {
+    error = { message: err.message };
+  } finally {
+    deleting = false;
+    if (btn) { btn.disabled = false; btn.textContent = '删除'; }
+  }
   if (error) { alert('删除失败：' + error.message); return; }
   await load();
 }
 
 document.getElementById('mask').addEventListener('click', function (e) {
   if (e.target === this) closeModal();
+});
+document.getElementById('confirmMask').addEventListener('click', function (e) {
+  if (e.target === this) closeConfirm();
 });
 document.getElementById('fAmount').addEventListener('keydown', function (e) {
   if (e.key === 'Enter') saveRecord();
