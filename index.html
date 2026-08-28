@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家庭存钱计划</title>
+<style>
+  :root {
+    --primary: #ff9f43;
+    --primary-dark: #e8892e;
+    --income: #e74c3c;
+    --expense: #27ae60;
+    --bg: #f7f4ef;
+    --card: #ffffff;
+    --text: #3d3229;
+    --text-light: #8c8177;
+    --border: #eee6dc;
+    --shadow: 0 4px 16px rgba(120, 90, 40, .08);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  body { background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
+
+  .header {
+    background: linear-gradient(135deg, #ffb457, #ff8c42);
+    color: #fff;
+    padding: 28px 24px 56px;
+    border-radius: 0 0 28px 28px;
+  }
+  .header h1 { font-size: 22px; font-weight: 700; }
+  .header p { font-size: 13px; opacity: .9; margin-top: 4px; }
+
+  .summary-card {
+    background: var(--card);
+    margin: -36px 16px 16px;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+    text-align: center;
+  }
+  .summary-label { font-size: 13px; color: var(--text-light); }
+  .summary-amount { font-size: 36px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .summary-amount.plus { color: var(--income); }
+  .summary-amount.minus { color: var(--expense); }
+  .summary-sub { display: flex; justify-content: center; gap: 28px; margin-top: 14px; font-size: 13px; color: var(--text-light); }
+  .summary-sub b { color: var(--text); }
+
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0 16px 12px;
+  }
+  .toolbar .title { font-size: 16px; font-weight: 600; }
+  .btn-add {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    padding: 9px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .btn-add:hover { background: var(--primary-dark); }
+
+  .list-wrap {
+    background: var(--card);
+    margin: 0 16px;
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead th {
+    text-align: left;
+    padding: 12px 14px;
+    background: #fdf8f1;
+    color: var(--text-light);
+    font-size: 12px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody td { padding: 13px 14px; border-bottom: 1px solid var(--border); }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #fffaf3; }
+  .date-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .amount-cell { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .amount-cell.in { color: var(--income); }
+  .amount-cell.out { color: var(--expense); }
+  .tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .tag.in { background: #fdecea; color: var(--income); }
+  .tag.out { background: #e8f7ef; color: var(--expense); }
+  .source-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; background: #f2eee8; color: var(--text-light); white-space: nowrap; }
+  .note-cell { color: var(--text-light); font-size: 13px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .action-btns { display: flex; gap: 4px; }
+  .edit-btn, .del-btn {
+    border: none; background: none; color: #ccc; font-size: 16px; cursor: pointer; padding: 2px 6px;
+  }
+  .edit-btn:hover { color: var(--primary); }
+  .del-btn:hover { color: var(--expense); }
+  .empty { text-align: center; padding: 48px 0; color: var(--text-light); font-size: 14px; }
+
+  .footer-total {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: #fdf8f1;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-light);
+  }
+  .footer-total .val {
+    font-size: 20px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mask {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(50, 40, 30, .45);
+    z-index: 100;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .mask.show { display: flex; }
+  .modal {
+    background: var(--card);
+    width: 100%;
+    max-width: 520px;
+    border-radius: 20px 20px 0 0;
+    padding: 22px 20px calc(20px + env(safe-area-inset-bottom));
+    animation: slideUp .25s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(60px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
+  .modal h3 { font-size: 17px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; }
+  .modal-close { border: none; background: #f2eee8; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; color: var(--text-light); font-size: 14px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; color: var(--text-light); margin-bottom: 6px; }
+  .field input, .field select {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 15px;
+    background: #fff;
+    color: var(--text);
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .field select {
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238c8177' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 34px;
+  }
+  .field input:focus, .field select:focus { border-color: var(--primary); }
+  .method-group { display: flex; gap: 10px; }
+  .method-group button {
+    flex: 1;
+    padding: 11px 0;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    font-size: 15px;
+    cursor: pointer;
+    color: var(--text-light);
+  }
+  .method-group button.active-in { border-color: var(--income); color: var(--income); background: #fdecea; font-weight: 600; }
+  .method-group button.active-out { border-color: var(--expense); color: var(--expense); background: #e8f7ef; font-weight: 600; }
+  .modal-actions { display: flex; gap: 12px; margin-top: 22px; }
+  .btn-cancel {
+    flex: 1; padding: 12px 0; border: none; border-radius: 12px;
+    background: #f2eee8; color: var(--text-light); font-size: 15px; cursor: pointer;
+  }
+  .btn-confirm {
+    flex: 2; padding: 12px 0; border: none; border-radius: 12px;
+    background: var(--primary); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .btn-confirm:hover { background: var(--primary-dark); }
+  .error-tip { color: var(--expense); font-size: 12px; margin-top: 4px; display: none; }
+
+  @media (min-width: 600px) {
+    .mask { align-items: center; }
+    .modal { border-radius: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🐷 家庭存钱计划</h1>
+  <p>一家人的小金库，一起攒起来</p>
+</div>
+
+<div class="summary-card">
+  <div class="summary-label">当前结余</div>
+  <div class="summary-amount" id="totalAmount">¥ 0.00</div>
+  <div class="summary-sub">
+    <span>存入 <b id="totalIn">¥ 0.00</b></span>
+    <span>支出 <b id="totalOut">¥ 0.00</b></span>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="title">存钱记录</div>
+  <button class="btn-add" onclick="openModal()">＋ 新增</button>
+</div>
+
+<div class="list-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>日期</th>
+        <th>金额</th>
+        <th>方式</th>
+        <th>来源</th>
+        <th>备注</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="listBody"></tbody>
+  </table>
+  <div class="empty" id="emptyTip">还没有记录，点击右上角「＋ 新增」开始存钱吧～</div>
+  <div class="footer-total">
+    <span>总金额（存入 + / 支出 −）</span>
+    <span class="val" id="footerTotal">¥ 0.00</span>
+  </div>
+</div>
+
+<!-- 新增/编辑弹窗 -->
+<div class="mask" id="mask">
+  <div class="modal">
+    <h3 id="modalTitle">新增记录 <button class="modal-close" onclick="closeModal()">✕</button></h3>
+
+    <div class="field">
+      <label>日期（仅到月份）</label>
+      <input type="month" id="fDate">
+      <div class="error-tip" id="tipDate">请选择日期</div>
+    </div>
+
+    <div class="field">
+      <label>金额（仅数字）</label>
+      <input type="text" id="fAmount" inputmode="decimal" placeholder="请输入金额，如 500" oninput="this.value=this.value.replace(/[^\d.]/g,'').replace(/\.{2,}/g,'.').replace(/^\./g,'')">
+      <div class="error-tip" id="tipAmount">请输入正确的金额</div>
+    </div>
+
+    <div class="field">
+      <label>方式</label>
+      <div class="method-group">
+        <button type="button" id="btnIn" class="active-in" onclick="setMethod('存入')">存入</button>
+        <button type="button" id="btnOut" onclick="setMethod('支出')">支出</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>来源</label>
+      <select id="fSource">
+        <option value="爸爸">爸爸</option>
+        <option value="妈妈" selected>妈妈</option>
+        <option value="儿子">儿子</option>
+        <option value="家庭">家庭</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>备注（选填）</label>
+      <input type="text" id="fNote" placeholder="如：本月零花钱结余" maxlength="50">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-confirm" onclick="saveRecord()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'family_savings_records_v1';
+let records = [];
+let currentMethod = '存入';
+let editingId = null;
+
+function load() {
+  try { records = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch (e) { records = []; }
+}
+
+function persist() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+}
+
+function fmtMoney(n) {
+  const num = Number(n) || 0;
+  const s = Math.abs(num).toLocaleString('zh-CN', { minimumFractionDigits: 2 });
+  return (num < 0 ? '-¥' : '¥') + s;
+}
+
+function render() {
+  const tbody = document.getElementById('listBody');
+  tbody.innerHTML = '';
+  const sorted = [...records].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+
+  sorted.forEach(r => {
+    const tr = document.createElement('tr');
+    const isIn = r.method === '存入';
+    tr.innerHTML = `
+      <td class="date-cell">${r.date}</td>
+      <td class="amount-cell ${isIn ? 'in' : 'out'}">${isIn ? '+' : '-'}${Number(r.amount).toLocaleString('zh-CN', {minimumFractionDigits: 2})}</td>
+      <td><span class="tag ${isIn ? 'in' : 'out'}">${r.method}</span></td>
+      <td><span class="source-tag">${r.source}</span></td>
+      <td class="note-cell" title="${r.note || ''}">${r.note || '—'}</td>
+      <td>
+        <div class="action-btns">
+          <button class="edit-btn" onclick="editRecord(${r.id})" title="编辑">✏️</button>
+          <button class="del-btn" onclick="delRecord(${r.id})" title="删除">🗑</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('emptyTip').style.display = records.length ? 'none' : 'block';
+
+  let totalIn = 0, totalOut = 0;
+  records.forEach(r => {
+    if (r.method === '存入') totalIn += Number(r.amount);
+    else totalOut += Number(r.amount);
+  });
+  const total = totalIn - totalOut;
+  const totalEl = document.getElementById('totalAmount');
+  totalEl.textContent = fmtMoney(total);
+  totalEl.className = 'summary-amount ' + (total >= 0 ? 'plus' : 'minus');
+  document.getElementById('totalIn').textContent = fmtMoney(totalIn);
+  document.getElementById('totalOut').textContent = fmtMoney(totalOut);
+
+  const ft = document.getElementById('footerTotal');
+  ft.textContent = fmtMoney(total);
+  ft.style.color = total >= 0 ? 'var(--income)' : 'var(--expense)';
+}
+
+function openModal() {
+  editingId = null;
+  document.getElementById('modalTitle').innerHTML = '新增记录 <button class="modal-close" onclick="closeModal()">✕</button>';
+  document.getElementById('mask').classList.add('show');
+  const now = new Date();
+  document.getElementById('fDate').value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  document.getElementById('fAmount').value = '';
+  document.getElementById('fNote').value = '';
+  document.getElementById('fSource').value = '妈妈';
+  setMethod('存入');
+  hideTips();
+}
+
+function editRecord(id) {
+  const record = records.find(r => r.id === id);
+  if (!record) return;
+  editingId = id;
+  document.getElementById('modalTitle').innerHTML = '编辑记录 <button class="modal-close" onclick="closeModal()">✕</button>';
+  document.getElementById('mask').classList.add('show');
+  document.getElementById('fDate').value = record.date;
+  document.getElementById('fAmount').value = record.amount;
+  document.getElementById('fSource').value = record.source;
+  document.getElementById('fNote').value = record.note || '';
+  setMethod(record.method);
+  hideTips();
+}
+
+function closeModal() {
+  document.getElementById('mask').classList.remove('show');
+  editingId = null;
+}
+
+function setMethod(m) {
+  currentMethod = m;
+  document.getElementById('btnIn').className = m === '存入' ? 'active-in' : '';
+  document.getElementById('btnOut').className = m === '支出' ? 'active-out' : '';
+}
+
+function hideTips() {
+  document.getElementById('tipDate').style.display = 'none';
+  document.getElementById('tipAmount').style.display = 'none';
+}
+
+function saveRecord() {
+  hideTips();
+  const date = document.getElementById('fDate').value;
+  const amountStr = document.getElementById('fAmount').value.trim();
+  const source = document.getElementById('fSource').value;
+  const note = document.getElementById('fNote').value.trim();
+
+  let ok = true;
+  if (!date) { document.getElementById('tipDate').style.display = 'block'; ok = false; }
+  const amount = Number(amountStr);
+  if (!amountStr || isNaN(amount) || amount <= 0) {
+    document.getElementById('tipAmount').style.display = 'block'; ok = false;
+  }
+  if (!ok) return;
+
+  if (editingId) {
+    const record = records.find(r => r.id === editingId);
+    if (record) {
+      record.date = date; record.amount = amount;
+      record.method = currentMethod; record.source = source; record.note = note;
+    }
+  } else {
+    records.push({ id: Date.now(), date, amount, method: currentMethod, source, note });
+  }
+  persist(); render(); closeModal();
+}
+
+function delRecord(id) {
+  if (!confirm('确定删除这条记录吗？')) return;
+  records = records.filter(r => r.id !== id);
+  persist(); render();
+}
+
+document.getElementById('mask').addEventListener('click', function (e) {
+  if (e.target === this) closeModal();
+});
+
+document.getElementById('fAmount').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') saveRecord();
+});
+
+load(); render();
+</script>
+</body>
+</html>
