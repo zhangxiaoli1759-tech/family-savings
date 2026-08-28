@@ -87,6 +87,7 @@
     white-space: nowrap; color: var(--text-light);
   }
   .bar {
+    position: relative;
     width: 70%; max-width: 26px; border-radius: 6px 6px 0 0;
     transition: height .4s ease; min-height: 2px;
   }
@@ -96,6 +97,24 @@
     margin-top: 8px; font-size: 11px; color: var(--text-light);
     font-variant-numeric: tabular-nums; white-space: nowrap;
   }
+
+  /* 柱状图 hover/点击 tooltip：展示当月收入、支出明细 */
+  .bar-tip {
+    position: absolute; bottom: calc(100% + 18px); left: 50%; transform: translateX(-50%);
+    background: rgba(45, 36, 28, .95); color: #fff; border-radius: 8px;
+    padding: 7px 10px; font-size: 11px; line-height: 1.7; white-space: nowrap;
+    z-index: 30; opacity: 0; visibility: hidden; transition: opacity .15s ease;
+    pointer-events: none; box-shadow: 0 4px 14px rgba(0,0,0,.28);
+    font-variant-numeric: tabular-nums;
+  }
+  .bar-tip b { font-size: 12px; }
+  .bar-tip .tip-in { color: #ff8a75; }
+  .bar-tip .tip-out { color: #6ee7a0; }
+  /* 首末列贴边，避免 tooltip 被横向滚动容器裁剪 */
+  .bar-col:first-child .bar-tip { left: 0; transform: none; }
+  .bar-col:last-child .bar-tip { left: auto; right: 0; transform: none; }
+  .bar-col:hover .bar-tip,
+  .bar-col.tip-show .bar-tip { opacity: 1; visibility: visible; }
 
   /* 桌面：表格 */
   .table-view { display: none; }
@@ -301,9 +320,14 @@ function renderChart(months) {
     col.className = 'bar-col';
     const h = Math.max(2, Math.round((Math.abs(m.remain) / maxAbs) * maxBar));
     const cls = m.remain >= 0 ? 'in' : 'out';
+    const emptyMonth = m.in === 0 && m.out === 0;
+    // tooltip：该月收入、支出明细（hover 桌面 / 点击移动端）
+    const tip = emptyMonth
+      ? '<div class="bar-tip"><b>' + m.label + '</b><br>该月无记录</div>'
+      : '<div class="bar-tip"><b>' + m.label + '</b><br>收入 <span class="tip-in">' + fmtMoney(m.in) + '</span><br>支出 <span class="tip-out">' + fmtMoney(m.out) + '</span></div>';
     col.innerHTML = `
       <div class="bar-val">${m.remain === 0 ? '' : shortMoney(m.remain)}</div>
-      <div class="bar ${cls}" style="height:${h}px"></div>
+      <div class="bar ${cls}" style="height:${h}px">${tip}</div>
       <div class="bar-label">${m.label}</div>
     `;
     chart.appendChild(col);
@@ -378,6 +402,13 @@ function renderCards(months, yearRemain) {
   mr.textContent = fmtMoney(yearRemain);
   mr.style.color = yearRemain >= 0 ? 'var(--income)' : 'var(--expense)';
 }
+
+// 移动端：点击柱子显示 tooltip，点击其他区域隐藏
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('.bar-col.tip-show').forEach(c => c.classList.remove('tip-show'));
+  const col = e.target && e.target.closest ? e.target.closest('.bar-col') : null;
+  if (col) col.classList.add('tip-show');
+});
 
 buildYearSelect();
 load(new Date().getFullYear());
