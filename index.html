@@ -66,12 +66,10 @@
   .btn-add {
     background: var(--primary); color: #fff; border: none; border-radius: 22px;
     padding: 0 20px; min-height: 40px; font-size: 14px; font-weight: 600; cursor: pointer;
+    margin-left: auto;
   }
   .btn-add:hover { background: var(--primary-dark); }
   .btn-add:active { transform: scale(.97); }
-  .filter-actions { display: flex; gap: 8px; align-items: flex-end; margin-left: auto; flex: 0 0 auto; }
-
-  .sync-tip { text-align: center; font-size: 12px; color: var(--text-light); padding: 6px 14px; }
 
   /* 筛选栏 */
   .filter-bar {
@@ -174,6 +172,22 @@
     font-size: 13px; color: var(--text-light); flex-wrap: wrap;
   }
   .footer-total .val { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* 分页 */
+  .pager {
+    display: flex; justify-content: center; align-items: center; gap: 14px;
+    margin: 12px 14px 0; padding-bottom: 6px;
+    font-size: 13px; color: var(--text-light);
+  }
+  .pager button {
+    border: 1.5px solid var(--border); background: #fff; color: var(--text);
+    font-size: 14px; padding: 0 18px; min-height: 40px; border-radius: 10px;
+    cursor: pointer; white-space: nowrap;
+  }
+  .pager button:hover { background: #f7f1ea; color: var(--primary-dark); border-color: var(--primary); }
+  .pager button:disabled { opacity: .4; cursor: not-allowed; background: #fff; color: var(--text-light); }
+  .pager .page-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pager .page-num b { color: var(--text); }
 
   .mask {
     display: none; position: fixed; inset: 0; background: rgba(50, 40, 30, .45);
@@ -294,17 +308,13 @@
       <option value="支出">支出</option>
     </select>
   </div>
-  <div class="filter-actions">
-    <button class="filter-reset" id="resetBtn" onclick="clearFilters()">重置</button>
-    <button class="btn-add" onclick="openModal()">＋ 新增</button>
-  </div>
+  <button class="filter-reset" id="resetBtn" onclick="clearFilters()">重置</button>
+  <button class="btn-add" onclick="openModal()">＋ 新增</button>
 </div>
 
 <div class="filter-info">
   <span id="filterInfo">全部记录 · 0 条</span>
 </div>
-
-<div class="sync-tip" id="syncTip">数据加载中…</div>
 
 <div class="list-wrap">
   <!-- 桌面：表格 -->
@@ -334,6 +344,12 @@
     <span>总金额（存入 + / 支出 −）</span>
     <span class="val" id="footerTotal">¥ 0.00</span>
   </div>
+</div>
+
+<div class="pager" id="pager" style="display:none;">
+  <button id="prevBtn" onclick="goPage(-1)">‹ 上一页</button>
+  <span class="page-num" id="pageInfo">第 1/1 页</span>
+  <button id="nextBtn" onclick="goPage(1)">下一页 ›</button>
 </div>
 
 <!-- 新增/编辑弹窗 -->
@@ -408,6 +424,8 @@ let editingId = null;
 let pendingDeleteId = null;
 let deleting = false;
 let submitting = false;
+let currentPage = 1;
+const PAGE_SIZE = 10;
 
 function fmtMoney(n) {
   const num = Number(n) || 0;
@@ -416,14 +434,13 @@ function fmtMoney(n) {
 }
 
 async function load() {
-  document.getElementById('syncTip').textContent = '数据同步中…';
   const { data, error } = await supabaseClient
     .from('savings_records')
     .select('*')
     .order('date', { ascending: false });
 
   if (error) {
-    document.getElementById('syncTip').textContent = '加载失败：' + error.message;
+    document.getElementById('filterInfo').textContent = '加载失败：' + error.message;
     console.error(error);
     return;
   }
@@ -435,7 +452,6 @@ async function load() {
     source: r.source,
     note: r.note || ''
   }));
-  document.getElementById('syncTip').textContent = '已同步 · 共 ' + records.length + ' 条';
   populateYears();
   render();
 }
@@ -455,6 +471,7 @@ function applyFilter() {
   filterSource = document.getElementById('filterSource').value || '';
   filterYear = document.getElementById('filterYear').value || '';
   filterMethod = document.getElementById('filterMethod').value || '';
+  currentPage = 1;
   render();
 }
 
@@ -464,6 +481,22 @@ function clearFilters() {
   document.getElementById('filterSource').value = '';
   document.getElementById('filterYear').value = '';
   document.getElementById('filterMethod').value = '';
+  currentPage = 1;
+  render();
+}
+
+// 翻页：delta = -1 上一页 / 1 下一页
+function goPage(delta) {
+  const filtered = records.filter(r => {
+    if (filterSource && r.source !== filterSource) return false;
+    if (filterYear && (r.date || '').substring(0, 4) !== filterYear) return false;
+    if (filterMethod && r.method !== filterMethod) return false;
+    return true;
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const next = currentPage + delta;
+  if (next < 1 || next > totalPages) return;
+  currentPage = next;
   render();
 }
 
@@ -481,7 +514,13 @@ function render() {
     return true;
   });
 
-  filtered.forEach(r => {
+  // 分页：10 条/页，删除后页码越界自动钳制回最后一页
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+  const pageList = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  pageList.forEach(r => {
     const isIn = r.method === '存入';
     const cls = isIn ? 'in' : 'out';
     const amtText = (isIn ? '+' : '-') + Number(r.amount).toLocaleString('zh-CN', { minimumFractionDigits: 2 });
@@ -530,7 +569,19 @@ function render() {
   if (!filtered.length) {
     emptyTip.textContent = records.length
       ? '没有符合筛选条件的记录，点「重置」看看全部～'
-      : '还没有记录，点击右上角「＋ 新增」开始存钱吧～';
+      : '还没有记录，点击上方「＋ 新增」开始存钱吧～';
+  }
+
+  // 分页控件
+  const pager = document.getElementById('pager');
+  if (filtered.length > PAGE_SIZE) {
+    pager.style.display = 'flex';
+    document.getElementById('pageInfo').innerHTML =
+      '第 <b>' + currentPage + '</b>/' + totalPages + ' 页 · ' + filtered.length + ' 条';
+    document.getElementById('prevBtn').disabled = currentPage <= 1;
+    document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+  } else {
+    pager.style.display = 'none';
   }
 
   let totalIn = 0, totalOut = 0;
