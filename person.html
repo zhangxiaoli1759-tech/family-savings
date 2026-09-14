@@ -6,7 +6,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>个人分析 · 家庭存钱计划</title>
+<title>个人 · 家庭存钱计划</title>
 <script src="supabase-js.min.js"></script>
 <style>
   :root {
@@ -44,6 +44,7 @@
     color: #fff; text-decoration: none; font-size: 13px; opacity: .95;
     background: rgba(255,255,255,.2); padding: 7px 12px; border-radius: 14px;
   }
+  .header-links { display: flex; gap: 8px; flex-wrap: wrap; }
   .header h1 { font-size: 20px; font-weight: 700; margin-top: 14px; }
   .header p { font-size: 13px; opacity: .9; margin-top: 6px; }
 
@@ -243,8 +244,11 @@
 <body>
 
 <div class="header">
-  <a class="back" href="index.html">‹ 返回</a>
-  <h1>👤 个人分析</h1>
+  <div class="header-links">
+    <a class="back" href="index.html">‹ 返回</a>
+    <a class="back" href="travel.html">旅游 ›</a>
+  </div>
+  <h1>👤 个人</h1>
   <p>按月记录收入与卡账，余额自动计算</p>
 </div>
 
@@ -458,7 +462,7 @@ async function load() {
     console.error(error);
     return;
   }
-  records = (data || []).map(r => {
+  records = (data || []).filter(r => (r.type || '') !== '旅游').map(r => {
     const income = Number(r.amount) || 0;
     const n = parseNote(r.note);
     const card = Number(n.card) || 0;
