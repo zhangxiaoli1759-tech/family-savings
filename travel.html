@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>旅游台账 · 家庭存钱计划</title>
+<script src="supabase-js.min.js"></script>
+<style>
+  :root {
+    --primary: #ff9f43;
+    --primary-dark: #e8892e;
+    --income: #e74c3c;
+    --expense: #27ae60;
+    --bg: #f7f4ef;
+    --card: #ffffff;
+    --text: #3d3229;
+    --text-light: #8c8177;
+    --border: #eee6dc;
+    --shadow: 0 4px 16px rgba(120, 90, 40, .08);
+  }
+  * {
+    margin: 0; padding: 0; box-sizing: border-box;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    overflow-x: hidden;
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  }
+
+  .header {
+    background: linear-gradient(135deg, #ffb457, #ff8c42);
+    color: #fff;
+    padding: calc(22px + env(safe-area-inset-top)) 18px 54px;
+    border-radius: 0 0 28px 28px;
+  }
+  .header a.back {
+    display: inline-flex; align-items: center; gap: 4px;
+    color: #fff; text-decoration: none; font-size: 13px; opacity: .95;
+    background: rgba(255,255,255,.2); padding: 7px 12px; border-radius: 14px;
+  }
+  .header-links { display: flex; gap: 8px; flex-wrap: wrap; }
+  .header h1 { font-size: 20px; font-weight: 700; margin-top: 14px; }
+  .header p { font-size: 13px; opacity: .9; margin-top: 6px; }
+
+  .summary-card {
+    background: var(--card);
+    margin: -36px 14px 16px;
+    border-radius: 16px;
+    padding: 18px 16px;
+    box-shadow: var(--shadow);
+    display: flex; justify-content: space-around; text-align: center;
+  }
+  .summary-block { flex: 1; }
+  .summary-label { font-size: 13px; color: var(--text-light); }
+  .summary-amount { font-size: 26px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .summary-amount.plus { color: var(--income); }
+  .summary-amount.minus { color: var(--expense); }
+
+  .btn-add {
+    background: var(--primary); color: #fff; border: none; border-radius: 22px;
+    padding: 0 20px; min-height: 40px; font-size: 14px; font-weight: 600; cursor: pointer;
+    margin-left: auto; white-space: nowrap;
+  }
+  .btn-add:hover { background: var(--primary-dark); }
+  .btn-add:active { transform: scale(.97); }
+
+  .toolbar {
+    display: flex; justify-content: flex-end; align-items: center; gap: 10px;
+    margin: 0 14px 10px;
+  }
+
+  .list-wrap {
+    background: var(--card); margin: 0 14px; border-radius: 16px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+
+  /* 桌面：表格 */
+  .table-view { display: none; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead th {
+    text-align: left; padding: 12px 14px; background: #fdf8f1; color: var(--text-light);
+    font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border);
+  }
+  tbody td { padding: 13px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #fffaf3; }
+  .date-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .amount-cell { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--expense); }
+  .amount-cell.in { color: var(--income); }
+  .city-cell { font-weight: 600; }
+  .people-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+  .people-tag { display: inline-block; padding: 2px 9px; border-radius: 11px; font-size: 12px; background: #f2eee8; color: var(--text-light); white-space: nowrap; }
+  .action-btns { display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* 移动：卡片列表 */
+  .card-list { display: block; }
+  .rec-card { padding: 14px 15px; border-bottom: 1px solid var(--border); }
+  .rec-card:last-child { border-bottom: none; }
+  .rec-card:active { background: #fffaf3; }
+  .rec-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .rec-city { font-size: 15px; font-weight: 700; }
+  .rec-total { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--expense); white-space: nowrap; }
+  .rec-grid { margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .rec-grid .cell { background: #fdf8f1; border-radius: 10px; padding: 8px 4px; text-align: center; }
+  .rec-grid .lab { font-size: 11px; color: var(--text-light); }
+  .rec-grid .val { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rec-actions { margin-top: 12px; display: flex; justify-content: flex-end; gap: 10px; }
+
+  .link-btn {
+    border: none; background: #f7f1ea; border-radius: 8px; font-size: 13px;
+    cursor: pointer; padding: 9px 16px; min-height: 38px; white-space: nowrap;
+    color: var(--primary-dark);
+  }
+  .link-btn:hover { background: #fff0e0; }
+  .link-btn:active { opacity: .7; }
+  .add-btn {
+    border: none; background: var(--primary); color: #fff; border-radius: 8px;
+    font-size: 15px; font-weight: 700; cursor: pointer; padding: 0 14px; min-height: 38px; white-space: nowrap;
+  }
+  .add-btn:hover { background: var(--primary-dark); }
+  .add-btn:active { opacity: .7; }
+  .del-btn {
+    border: none; background: #f7f1ea; border-radius: 8px; font-size: 13px;
+    cursor: pointer; padding: 9px 16px; min-height: 38px; white-space: nowrap;
+    color: var(--expense);
+  }
+  .del-btn:hover { background: #e8f7ef; }
+  .del-btn:active { opacity: .7; }
+
+  .empty { text-align: center; padding: 44px 18px; color: var(--text-light); font-size: 14px; }
+  .loading { text-align: center; padding: 30px; color: var(--text-light); font-size: 14px; }
+
+  /* 明细钻取视图 */
+  #detailView .summary-card { margin-top: -36px; }
+  .detail-item { padding: 13px 15px; border-bottom: 1px solid var(--border); }
+  .detail-item:last-child { border-bottom: none; }
+  .detail-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .detail-cat { font-size: 15px; font-weight: 600; }
+  .detail-amt { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--expense); white-space: nowrap; }
+  .detail-remark { margin-top: 6px; font-size: 13px; color: var(--text-light); word-break: break-all; line-height: 1.5; }
+  .detail-actions { margin-top: 10px; display: flex; justify-content: flex-end; gap: 10px; }
+  /* 桌面明细表 */
+  .detail-table tbody td.amt { text-align: right; color: var(--expense); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* 弹窗（新增旅游 / 新增明细） */
+  .mask {
+    display: none; position: fixed; inset: 0; background: rgba(50, 40, 30, .45);
+    z-index: 100; align-items: flex-end; justify-content: center;
+  }
+  .mask.show { display: flex; }
+  .modal {
+    background: var(--card); width: 100%; max-width: 520px; border-radius: 20px 20px 0 0;
+    padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
+    animation: slideUp .25s ease;
+    max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  }
+  @keyframes slideUp { from { transform: translateY(60px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
+  .modal h3 { font-size: 17px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; }
+  .modal-close { border: none; background: #f2eee8; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: var(--text-light); font-size: 14px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; color: var(--text-light); margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 12px; border: 1.5px solid var(--border); border-radius: 10px;
+    font-size: 16px; /* 16px 防 iOS 聚焦自动放大 */
+    min-height: 46px;
+    background: #fff; color: var(--text); outline: none;
+    appearance: none; -webkit-appearance: none;
+  }
+  .field input:focus { border-color: var(--primary); }
+
+  /* 人员下拉多选 */
+  .ms { position: relative; }
+  .ms-control {
+    width: 100%; padding: 12px; border: 1.5px solid var(--border); border-radius: 10px;
+    font-size: 16px; min-height: 46px; background: #fff; color: var(--text);
+    cursor: pointer; display: flex; align-items: center;
+  }
+  .ms-control.placeholder { color: #b9b0a4; }
+  .ms-control:after {
+    content: ""; margin-left: auto; width: 12px; height: 8px;
+    background: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238c8177' stroke-width='2' fill='none'/%3E%3C/svg%3E") no-repeat center;
+  }
+  .ms-control:focus, .ms.open .ms-control { border-color: var(--primary); }
+  .ms-panel {
+    display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 20;
+    background: #fff; border: 1.5px solid var(--border); border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(120, 90, 40, .15); padding: 6px;
+  }
+  .ms.open .ms-panel { display: block; }
+  .ms-opt { display: flex; align-items: center; gap: 10px; padding: 11px 10px; font-size: 15px; cursor: pointer; border-radius: 8px; }
+  .ms-opt:hover { background: #fdf8f1; }
+  .ms-opt input { width: 18px; height: 18px; accent-color: var(--primary); }
+
+  .modal-actions { display: flex; gap: 12px; margin-top: 20px; }
+  .btn-cancel {
+    flex: 1; padding: 0; min-height: 46px; border: none; border-radius: 12px;
+    background: #f2eee8; color: var(--text-light); font-size: 15px; cursor: pointer;
+  }
+  .btn-confirm {
+    flex: 2; padding: 0; min-height: 46px; border: none; border-radius: 12px;
+    background: var(--primary); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .btn-confirm:hover { background: var(--primary-dark); }
+  .btn-confirm:disabled { background: #f0c9a0; cursor: not-allowed; }
+  .error-tip { color: var(--expense); font-size: 12px; margin-top: 4px; display: none; }
+
+  .confirm-box {
+    background: var(--card); width: 86%; max-width: 320px; border-radius: 16px; padding: 24px 20px 18px;
+    text-align: center; animation: slideUp .2s ease;
+  }
+  .confirm-text { font-size: 15px; color: var(--text); margin-bottom: 22px; line-height: 1.5; }
+  .confirm-actions { display: flex; gap: 12px; }
+  .confirm-actions .btn-cancel { flex: 1; }
+  .btn-danger {
+    flex: 1; padding: 0; min-height: 44px; border: none; border-radius: 12px;
+    background: var(--expense); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .btn-danger:hover { background: #1f9c51; }
+
+  @media (min-width: 721px) {
+    .table-view, .detail-table { display: block; }
+    .card-list { display: none; }
+    .mask { align-items: center; }
+    .modal { border-radius: 20px; max-height: 86vh; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 列表视图 -->
+<div id="listView">
+  <div class="header">
+    <div class="header-links">
+      <a class="back" href="index.html">‹ 返回</a>
+    </div>
+    <h1>🧳 旅游台账</h1>
+    <p>记录每一次出发，花费自动累计</p>
+  </div>
+
+  <div class="summary-card">
+    <div class="summary-block">
+      <div class="summary-label">旅行次数</div>
+      <div class="summary-amount plus" id="tripCount">0</div>
+    </div>
+    <div class="summary-block">
+      <div class="summary-label">总花费合计</div>
+      <div class="summary-amount minus" id="tripTotal">¥ 0.00</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-add" onclick="openTravelModal()">＋ 新增旅游</button>
+  </div>
+
+  <div class="list-wrap">
+    <!-- 桌面：表格 -->
+    <div class="table-view">
+      <table>
+        <thead>
+          <tr>
+            <th>城市</th>
+            <th>开始时间</th>
+            <th>结束时间</th>
+            <th>人员</th>
+            <th>总花费</th>
+            <th>明细</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="listBody">
+          <tr><td colspan="7" class="loading">加载中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 移动：卡片列表 -->
+    <div class="card-list" id="cardList"></div>
+
+    <div class="empty" id="emptyTip" style="display:none;">还没有旅游记录，点击右上角「＋ 新增旅游」开始记录吧～</div>
+  </div>
+</div>
+
+<!-- 明细钻取视图 -->
+<div id="detailView" style="display:none;">
+  <div class="header">
+    <div class="header-links">
+      <a class="back" href="javascript:void(0)" onclick="backToList()">‹ 返回旅游列表</a>
+    </div>
+    <h1 id="detailTitle">旅游明细</h1>
+    <p id="detailSub"></p>
+  </div>
+
+  <div class="summary-card">
+    <div class="summary-block">
+      <div class="summary-label">本次总花费</div>
+      <div class="summary-amount minus" id="detailTotal">¥ 0.00</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-add" onclick="openDetailAdd()">＋ 新增明细</button>
+  </div>
+
+  <div class="list-wrap">
+    <div class="table-view detail-table">
+      <table>
+        <thead>
+          <tr>
+            <th>类目</th>
+            <th>金额</th>
+            <th>备注</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="detailBody">
+          <tr><td colspan="4" class="loading">加载中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card-list" id="detailCardList"></div>
+
+    <div class="empty" id="detailEmpty" style="display:none;">还没有明细，点击「＋ 新增明细」添加吧～</div>
+  </div>
+</div>
+
+<!-- 新增/编辑旅游弹窗 -->
+<div class="mask" id="travelMask">
+  <div class="modal">
+    <h3 id="travelTitle">新增旅游 <button class="modal-close" onclick="closeTravelModal()">✕</button></h3>
+
+    <div class="field">
+      <label>城市</label>
+      <input type="text" id="fCity" placeholder="如：杭州、日本东京" maxlength="30">
+      <div class="error-tip" id="tipCity">请输入城市</div>
+    </div>
+
+    <div class="field">
+      <label>开始时间</label>
+      <input type="date" id="fStart">
+      <div class="error-tip" id="tipStart">请选择开始时间</div>
+    </div>
+
+    <div class="field">
+      <label>结束时间</label>
+      <input type="date" id="fEnd">
+      <div class="error-tip" id="tipEnd">请选择结束时间</div>
+      <div class="error-tip" id="tipRange">结束时间不能早于开始时间</div>
+    </div>
+
+    <div class="field">
+      <label>人员（可多选）</label>
+      <div class="ms" id="peopleMs">
+        <div class="ms-control placeholder" id="peopleCtrl" onclick="togglePeople()">请选择人员</div>
+        <div class="ms-panel" id="peoplePanel">
+          <label class="ms-opt"><input type="checkbox" value="爸爸" onchange="onPeopleChange()"> 爸爸</label>
+          <label class="ms-opt"><input type="checkbox" value="妈妈" onchange="onPeopleChange()"> 妈妈</label>
+          <label class="ms-opt"><input type="checkbox" value="儿子" onchange="onPeopleChange()"> 儿子</label>
+        </div>
+      </div>
+      <div class="error-tip" id="tipPeople">请至少选择一名人员</div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeTravelModal()">取消</button>
+      <button class="btn-confirm" onclick="saveTravel()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新增明细弹窗 -->
+<div class="mask" id="detailMask">
+  <div class="modal">
+    <h3>新增明细 <button class="modal-close" onclick="closeDetailModal()">✕</button></h3>
+
+    <div class="field">
+      <label>类目</label>
+      <input type="text" id="fCat" placeholder="如：交通、住宿、餐饮、门票" maxlength="20">
+      <div class="error-tip" id="tipCat">请输入类目</div>
+    </div>
+
+    <div class="field">
+      <label>金额（仅数字）</label>
+      <input type="text" id="fDetailAmount" inputmode="decimal" placeholder="如 1200" oninput="this.value=this.value.replace(/[^\d.]/g,'').replace(/\.{2,}/g,'.').replace(/^\./g,'')">
+      <div class="error-tip" id="tipDetailAmount">请输入正确的金额</div>
+    </div>
+
+    <div class="field">
+      <label>备注（选填）</label>
+      <input type="text" id="fDetailRemark" placeholder="如：高铁往返" maxlength="50">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeDetailModal()">取消</button>
+      <button class="btn-confirm" onclick="saveDetail()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 删除确认弹窗（自定义，避免 webview 屏蔽原生 confirm） -->
+<div class="mask" id="confirmMask">
+  <div class="confirm-box">
+    <div class="confirm-text" id="confirmText">确定删除吗？</div>
+    <div class="confirm-actions">
+      <button class="btn-cancel" onclick="closeConfirm()">取消</button>
+      <button class="btn-danger" onclick="doConfirm()">删除</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://cbnbbrrfbolwvuejoqmk.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_pbzgGVvgjaSovXpCmp8-qw_AlafRvF6';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const PEOPLE_OPTIONS = ['爸爸', '妈妈', '儿子'];
+
+let travels = [];
+let currentView = 'list';   // 'list' | 'detail'
+let activeTravelId = null;
+let editingTravelId = null;
+let selectedPeople = [];
+let submitting = false;
+let confirmAction = null;
+
+function fmtMoney(n) {
+  const num = Number(n) || 0;
+  const s = Math.abs(num).toLocaleString('zh-CN', { minimumFractionDigits: 2 });
+  return (num < 0 ? '-¥' : '¥') + s;
+}
+
+// note 字段存 JSON：{"city","start","end","people":[],"details":[{"cat","amount","remark"}]}
+function parseNote(note) {
+  if (!note) return {};
+  try {
+    const o = JSON.parse(note);
+    return (o && typeof o === 'object') ? o : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function computeTotal(t) {
+  return (t.details || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+}
+
+async function load() {
+  const { data, error } = await supabaseClient
+    .from('personal_records')
+    .select('*')
+    .eq('type', '旅游')
+    .order('date', { ascending: false });
+
+  if (error) {
+    document.getElementById('emptyTip').textContent = '加载失败：' + error.message;
+    document.getElementById('emptyTip').style.display = 'block';
+    console.error(error);
+    return;
+  }
+  travels = (data || []).map(r => {
+    const n = parseNote(r.note);
+    return {
+      id: r.id,
+      date: r.date,
+      city: n.city || '',
+      start: n.start || '',
+      end: n.end || '',
+      people: Array.isArray(n.people) ? n.people : [],
+      details: Array.isArray(n.details) ? n.details : []
+    };
+  });
+  renderApp();
+}
+
+// 根据当前视图渲染（保留明细钻取状态）
+function renderApp() {
+  if (currentView === 'detail') {
+    document.getElementById('listView').style.display = 'none';
+    document.getElementById('detailView').style.display = 'block';
+    renderDetail();
+  } else {
+    document.getElementById('detailView').style.display = 'none';
+    document.getElementById('listView').style.display = 'block';
+    renderList();
+  }
+}
+
+function renderList() {
+  const tbody = document.getElementById('listBody');
+  const clist = document.getElementById('cardList');
+  tbody.innerHTML = '';
+  clist.innerHTML = '';
+
+  const tripCount = travels.length;
+  const tripTotal = travels.reduce((s, t) => s + computeTotal(t), 0);
+  document.getElementById('tripCount').textContent = tripCount;
+  document.getElementById('tripTotal').textContent = fmtMoney(tripTotal);
+
+  travels.forEach(t => {
+    const total = computeTotal(t);
+    const peopleHtml = (t.people && t.people.length)
+      ? t.people.map(p => '<span class="people-tag">' + p + '</span>').join('')
+      : '<span class="people-tag">—</span>';
+
+    // 桌面表格行
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="city-cell">${t.city || '—'}</td>
+      <td class="date-cell">${t.start || '—'}</td>
+      <td class="date-cell">${t.end || '—'}</td>
+      <td><div class="people-tags">${peopleHtml}</div></td>
+      <td class="amount-cell">${fmtMoney(total)}</td>
+      <td><button class="link-btn" onclick="openDetail(${t.id})">明细 (${t.details.length})</button></td>
+      <td>
+        <div class="action-btns">
+          <button class="add-btn" onclick="openAddDetail(${t.id})">＋</button>
+          <button class="del-btn" onclick="askDeleteTravel(${t.id})">删除</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+
+    // 移动端卡片
+    const card = document.createElement('div');
+    card.className = 'rec-card';
+    card.innerHTML = `
+      <div class="rec-top">
+        <span class="rec-city">${t.city || '—'}</span>
+        <span class="rec-total">${fmtMoney(total)}</span>
+      </div>
+      <div class="rec-grid">
+        <div class="cell"><div class="lab">开始</div><div class="val">${t.start || '—'}</div></div>
+        <div class="cell"><div class="lab">结束</div><div class="val">${t.end || '—'}</div></div>
+        <div class="cell"><div class="lab">人员</div><div class="val">${t.people.join('、') || '—'}</div></div>
+      </div>
+      <div class="rec-actions">
+        <button class="link-btn" onclick="openDetail(${t.id})">明细 (${t.details.length})</button>
+        <button class="add-btn" onclick="openAddDetail(${t.id})">＋明细</button>
+        <button class="del-btn" onclick="askDeleteTravel(${t.id})">删除</button>
+      </div>
+    `;
+    clist.appendChild(card);
+  });
+
+  const emptyTip = document.getElementById('emptyTip');
+  emptyTip.style.display = travels.length ? 'none' : 'block';
+}
+
+/* ---------- 明细钻取 ---------- */
+function openDetail(id) {
+  activeTravelId = id;
+  currentView = 'detail';
+  renderApp();
+}
+
+function backToList() {
+  currentView = 'list';
+  activeTravelId = null;
+  renderApp();
+}
+
+function renderDetail() {
+  const t = travels.find(x => x.id === activeTravelId);
+  if (!t) { backToList(); return; }
+
+  document.getElementById('detailTitle').textContent = t.city || '旅游明细';
+  const peopleStr = (t.people && t.people.length) ? t.people.join('、') : '—';
+  document.getElementById('detailSub').textContent =
+    (t.start || '?') + ' ~ ' + (t.end || '?') + ' · ' + peopleStr;
+  document.getElementById('detailTotal').textContent = fmtMoney(computeTotal(t));
+
+  const tbody = document.getElementById('detailBody');
+  const clist = document.getElementById('detailCardList');
+  tbody.innerHTML = '';
+  clist.innerHTML = '';
+
+  t.details.forEach((d, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${d.cat || '—'}</td>
+      <td class="amt">${fmtMoney(d.amount)}</td>
+      <td>${d.remark || '—'}</td>
+      <td>
+        <div class="action-btns">
+          <button class="del-btn" onclick="askDeleteDetail(${idx})">删除</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+
+    const card = document.createElement('div');
+    card.className = 'detail-item';
+    card.innerHTML = `
+      <div class="detail-top">
+        <span class="detail-cat">${d.cat || '—'}</span>
+        <span class="detail-amt">${fmtMoney(d.amount)}</span>
+      </div>
+      ${d.remark ? `<div class="detail-remark">${d.remark}</div>` : ''}
+      <div class="detail-actions">
+        <button class="del-btn" onclick="askDeleteDetail(${idx})">删除</button>
+      </div>
+    `;
+    clist.appendChild(card);
+  });
+
+  const emptyTip = document.getElementById('detailEmpty');
+  emptyTip.style.display = t.details.length ? 'none' : 'block';
+}
+
+/* ---------- 人员下拉多选 ---------- */
+function togglePeople() {
+  const ms = document.getElementById('peopleMs');
+  ms.classList.toggle('open');
+}
+function onPeopleChange() {
+  const boxes = document.querySelectorAll('#peoplePanel input[type=checkbox]');
+  selectedPeople = Array.from(boxes).filter(b => b.checked).map(b => b.value);
+  updatePeopleLabel();
+}
+function updatePeopleLabel() {
+  const ctrl = document.getElementById('peopleCtrl');
+  if (selectedPeople.length) {
+    ctrl.textContent = selectedPeople.join('、');
+    ctrl.classList.remove('placeholder');
+  } else {
+    ctrl.textContent = '请选择人员';
+    ctrl.classList.add('placeholder');
+  }
+}
+document.addEventListener('click', function (e) {
+  const ms = document.getElementById('peopleMs');
+  if (ms && !ms.contains(e.target)) ms.classList.remove('open');
+});
+
+/* ---------- 新增/编辑旅游 ---------- */
+function openTravelModal() {
+  editingTravelId = null;
+  document.getElementById('travelTitle').innerHTML = '新增旅游 <button class="modal-close" onclick="closeTravelModal()">✕</button>';
+  document.getElementById('travelMask').classList.add('show');
+  document.getElementById('fCity').value = '';
+  document.getElementById('fStart').value = '';
+  document.getElementById('fEnd').value = '';
+  selectedPeople = [];
+  document.querySelectorAll('#peoplePanel input[type=checkbox]').forEach(b => b.checked = false);
+  updatePeopleLabel();
+  hideTravelTips();
+}
+
+function editTravel(id) {
+  const t = travels.find(x => x.id === id);
+  if (!t) return;
+  editingTravelId = id;
+  document.getElementById('travelTitle').innerHTML = '编辑旅游 <button class="modal-close" onclick="closeTravelModal()">✕</button>';
+  document.getElementById('travelMask').classList.add('show');
+  document.getElementById('fCity').value = t.city;
+  document.getElementById('fStart').value = t.start;
+  document.getElementById('fEnd').value = t.end;
+  selectedPeople = (t.people || []).slice();
+  document.querySelectorAll('#peoplePanel input[type=checkbox]').forEach(b => {
+    b.checked = selectedPeople.includes(b.value);
+  });
+  updatePeopleLabel();
+  hideTravelTips();
+}
+
+function closeTravelModal() {
+  document.getElementById('travelMask').classList.remove('show');
+  editingTravelId = null;
+}
+
+function hideTravelTips() {
+  ['tipCity', 'tipStart', 'tipEnd', 'tipRange', 'tipPeople'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+}
+
+async function saveTravel() {
+  if (submitting) return;
+  hideTravelTips();
+  const city = document.getElementById('fCity').value.trim();
+  const start = document.getElementById('fStart').value;
+  const end = document.getElementById('fEnd').value;
+
+  let ok = true;
+  if (!city) { document.getElementById('tipCity').style.display = 'block'; ok = false; }
+  if (!start) { document.getElementById('tipStart').style.display = 'block'; ok = false; }
+  if (!end) { document.getElementById('tipEnd').style.display = 'block'; ok = false; }
+  if (start && end && end < start) { document.getElementById('tipRange').style.display = 'block'; ok = false; }
+  if (selectedPeople.length === 0) { document.getElementById('tipPeople').style.display = 'block'; ok = false; }
+  if (!ok) return;
+
+  const existing = editingTravelId ? travels.find(x => x.id === editingTravelId) : null;
+  const details = existing ? (existing.details || []) : [];
+  const payload = {
+    date: start,
+    amount: 0,
+    type: '旅游',
+    source: '家庭',
+    note: JSON.stringify({ city, start, end, people: selectedPeople, details })
+  };
+
+  submitting = true;
+  const btn = document.querySelector('#travelMask .btn-confirm');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '保存中…';
+
+  let res;
+  try {
+    if (editingTravelId) {
+      res = await supabaseClient.from('personal_records').update(payload).eq('id', editingTravelId);
+    } else {
+      res = await supabaseClient.from('personal_records').insert(payload);
+    }
+  } catch (err) {
+    res = { error: { message: err.message } };
+  } finally {
+    submitting = false;
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+
+  if (res.error) { alert('保存失败：' + res.error.message); return; }
+  closeTravelModal();
+  await load();
+}
+
+/* ---------- 新增明细 ---------- */
+function openAddDetail(travelId) {
+  activeTravelId = travelId;
+  openDetailAdd();
+}
+
+function openDetailAdd() {
+  if (activeTravelId == null) return;
+  document.getElementById('detailMask').classList.add('show');
+  document.getElementById('fCat').value = '';
+  document.getElementById('fDetailAmount').value = '';
+  document.getElementById('fDetailRemark').value = '';
+  hideDetailTips();
+}
+
+function closeDetailModal() {
+  document.getElementById('detailMask').classList.remove('show');
+}
+
+function hideDetailTips() {
+  document.getElementById('tipCat').style.display = 'none';
+  document.getElementById('tipDetailAmount').style.display = 'none';
+}
+
+async function saveDetail() {
+  if (submitting) return;
+  hideDetailTips();
+  const cat = document.getElementById('fCat').value.trim();
+  const amtStr = document.getElementById('fDetailAmount').value.trim();
+  const remark = document.getElementById('fDetailRemark').value.trim();
+
+  let ok = true;
+  if (!cat) { document.getElementById('tipCat').style.display = 'block'; ok = false; }
+  const amount = Number(amtStr);
+  if (!amtStr || isNaN(amount) || amount <= 0) {
+    document.getElementById('tipDetailAmount').style.display = 'block'; ok = false;
+  }
+  if (!ok) return;
+
+  const t = travels.find(x => x.id === activeTravelId);
+  if (!t) return;
+  t.details = (t.details || []).concat([{ cat, amount, remark }]);
+
+  submitting = true;
+  const btn = document.querySelector('#detailMask .btn-confirm');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '保存中…';
+
+  const payload = { note: JSON.stringify({
+    city: t.city, start: t.start, end: t.end, people: t.people, details: t.details
+  }) };
+
+  let res;
+  try {
+    res = await supabaseClient.from('personal_records').update(payload).eq('id', t.id);
+  } catch (err) {
+    res = { error: { message: err.message } };
+  } finally {
+    submitting = false;
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+
+  if (res.error) { alert('保存失败：' + res.error.message); return; }
+  closeDetailModal();
+  await load();
+}
+
+/* ---------- 删除 ---------- */
+function askDeleteTravel(id) {
+  confirmAction = () => doDeleteTravel(id);
+  showConfirm('确定删除这次旅游记录吗？');
+}
+function askDeleteDetail(idx) {
+  confirmAction = () => doDeleteDetail(idx);
+  showConfirm('确定删除这条明细吗？');
+}
+function showConfirm(text) {
+  document.getElementById('confirmText').textContent = text;
+  document.getElementById('confirmMask').classList.add('show');
+}
+function closeConfirm() {
+  document.getElementById('confirmMask').classList.remove('show');
+  confirmAction = null;
+}
+function doConfirm() {
+  const a = confirmAction;
+  closeConfirm();
+  if (a) a();
+}
+
+async function doDeleteTravel(id) {
+  if (deleting) return;
+  deleting = true;
+  let error = null;
+  try {
+    const r = await supabaseClient.from('personal_records').delete().eq('id', id);
+    error = r.error;
+  } catch (err) {
+    error = { message: err.message };
+  } finally {
+    deleting = false;
+  }
+  if (error) { alert('删除失败：' + error.message); return; }
+  if (currentView === 'detail' && activeTravelId === id) backToList();
+  await load();
+}
+
+async function doDeleteDetail(idx) {
+  if (deleting) return;
+  const t = travels.find(x => x.id === activeTravelId);
+  if (!t) return;
+  t.details = (t.details || []).filter((_, i) => i !== idx);
+
+  deleting = true;
+  let error = null;
+  try {
+    const r = await supabaseClient.from('personal_records').update({
+      note: JSON.stringify({ city: t.city, start: t.start, end: t.end, people: t.people, details: t.details })
+    }).eq('id', t.id);
+    error = r.error;
+  } catch (err) {
+    error = { message: err.message };
+  } finally {
+    deleting = false;
+  }
+  if (error) { alert('删除失败：' + error.message); return; }
+  await load();
+}
+
+let deleting = false;
+
+document.getElementById('travelMask').addEventListener('click', function (e) {
+  if (e.target === this) closeTravelModal();
+});
+document.getElementById('detailMask').addEventListener('click', function (e) {
+  if (e.target === this) closeDetailModal();
+});
+document.getElementById('confirmMask').addEventListener('click', function (e) {
+  if (e.target === this) closeConfirm();
+});
+
+load();
+</script>
+</body>
+</html>
