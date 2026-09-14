@@ -173,6 +173,18 @@
     appearance: none; -webkit-appearance: none;
   }
   .field input:focus { border-color: var(--primary); }
+  .field select {
+    width: 100%; padding: 12px; border: 1.5px solid var(--border); border-radius: 10px;
+    font-size: 16px; /* 16px 防 iOS 聚焦自动放大 */
+    min-height: 46px;
+    background-color: #fff; color: var(--text); outline: none;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238c8177' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 14px center;
+    padding-right: 36px;
+  }
+  .field select:focus { border-color: var(--primary); }
+  .field select.placeholder { color: #b9b0a4; }
 
   /* 人员下拉多选 */
   .ms { position: relative; }
@@ -193,9 +205,20 @@
     box-shadow: 0 8px 24px rgba(120, 90, 40, .15); padding: 6px;
   }
   .ms.open .ms-panel { display: block; }
-  .ms-opt { display: flex; align-items: center; gap: 10px; padding: 11px 10px; font-size: 15px; cursor: pointer; border-radius: 8px; }
-  .ms-opt:hover { background: #fdf8f1; }
-  .ms-opt input { width: 18px; height: 18px; accent-color: var(--primary); }
+  .ms-opt { display: flex; align-items: center; gap: 10px; padding: 11px 10px; font-size: 15px; cursor: pointer; border-radius: 8px; -webkit-tap-highlight-color: transparent; }
+  .ms-opt:hover, .ms-opt.selected { background: #fdf8f1; }
+  /* 自定义勾选框，避免原生 checkbox 在各 webview 下变形 */
+  .ms-box {
+    flex: 0 0 auto; width: 20px; height: 20px; border-radius: 6px;
+    border: 1.5px solid #d8cdbd; background: #fff; position: relative;
+    transition: background .15s, border-color .15s;
+  }
+  .ms-opt.selected .ms-box { border-color: var(--primary); background: var(--primary); }
+  .ms-opt.selected .ms-box:after {
+    content: ""; position: absolute; left: 6px; top: 2px;
+    width: 5px; height: 10px; border: solid #fff; border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
 
   .modal-actions { display: flex; gap: 12px; margin-top: 20px; }
   .btn-cancel {
@@ -359,9 +382,9 @@
       <div class="ms" id="peopleMs">
         <div class="ms-control placeholder" id="peopleCtrl" onclick="togglePeople()">请选择人员</div>
         <div class="ms-panel" id="peoplePanel">
-          <label class="ms-opt"><input type="checkbox" value="爸爸" onchange="onPeopleChange()"> 爸爸</label>
-          <label class="ms-opt"><input type="checkbox" value="妈妈" onchange="onPeopleChange()"> 妈妈</label>
-          <label class="ms-opt"><input type="checkbox" value="儿子" onchange="onPeopleChange()"> 儿子</label>
+          <div class="ms-opt" data-val="爸爸" onclick="togglePeopleOpt(this)"><span class="ms-box"></span>爸爸</div>
+          <div class="ms-opt" data-val="妈妈" onclick="togglePeopleOpt(this)"><span class="ms-box"></span>妈妈</div>
+          <div class="ms-opt" data-val="儿子" onclick="togglePeopleOpt(this)"><span class="ms-box"></span>儿子</div>
         </div>
       </div>
       <div class="error-tip" id="tipPeople">请至少选择一名人员</div>
@@ -381,8 +404,16 @@
 
     <div class="field">
       <label>类目</label>
-      <input type="text" id="fCat" placeholder="如：交通、住宿、餐饮、门票" maxlength="20">
-      <div class="error-tip" id="tipCat">请输入类目</div>
+      <select id="fCat" class="placeholder" onchange="onCatChange()">
+        <option value="" disabled selected>请选择类目</option>
+        <option value="车票">车票</option>
+        <option value="酒店">酒店</option>
+        <option value="门票">门票</option>
+        <option value="吃饭">吃饭</option>
+        <option value="购物">购物</option>
+        <option value="其他">其他</option>
+      </select>
+      <div class="error-tip" id="tipCat">请选择类目</div>
     </div>
 
     <div class="field">
@@ -618,9 +649,15 @@ function togglePeople() {
   const ms = document.getElementById('peopleMs');
   ms.classList.toggle('open');
 }
-function onPeopleChange() {
-  const boxes = document.querySelectorAll('#peoplePanel input[type=checkbox]');
-  selectedPeople = Array.from(boxes).filter(b => b.checked).map(b => b.value);
+function togglePeopleOpt(el) {
+  const val = el.getAttribute('data-val');
+  if (el.classList.contains('selected')) {
+    el.classList.remove('selected');
+    selectedPeople = selectedPeople.filter(p => p !== val);
+  } else {
+    el.classList.add('selected');
+    if (!selectedPeople.includes(val)) selectedPeople.push(val);
+  }
   updatePeopleLabel();
 }
 function updatePeopleLabel() {
@@ -647,7 +684,7 @@ function openTravelModal() {
   document.getElementById('fStart').value = '';
   document.getElementById('fEnd').value = '';
   selectedPeople = [];
-  document.querySelectorAll('#peoplePanel input[type=checkbox]').forEach(b => b.checked = false);
+  document.querySelectorAll('#peoplePanel .ms-opt').forEach(o => o.classList.remove('selected'));
   updatePeopleLabel();
   hideTravelTips();
 }
@@ -662,8 +699,8 @@ function editTravel(id) {
   document.getElementById('fStart').value = t.start;
   document.getElementById('fEnd').value = t.end;
   selectedPeople = (t.people || []).slice();
-  document.querySelectorAll('#peoplePanel input[type=checkbox]').forEach(b => {
-    b.checked = selectedPeople.includes(b.value);
+  document.querySelectorAll('#peoplePanel .ms-opt').forEach(o => {
+    o.classList.toggle('selected', selectedPeople.includes(o.getAttribute('data-val')));
   });
   updatePeopleLabel();
   hideTravelTips();
@@ -740,10 +777,18 @@ function openAddDetail(travelId) {
 function openDetailAdd() {
   if (activeTravelId == null) return;
   document.getElementById('detailMask').classList.add('show');
-  document.getElementById('fCat').value = '';
+  const sel = document.getElementById('fCat');
+  sel.value = '';
+  sel.classList.add('placeholder');
   document.getElementById('fDetailAmount').value = '';
   document.getElementById('fDetailRemark').value = '';
   hideDetailTips();
+}
+
+function onCatChange() {
+  const sel = document.getElementById('fCat');
+  if (sel.value) sel.classList.remove('placeholder');
+  else sel.classList.add('placeholder');
 }
 
 function closeDetailModal() {
